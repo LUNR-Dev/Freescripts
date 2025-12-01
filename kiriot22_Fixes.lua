@@ -1,4 +1,4 @@
--- Strict-clean ESP module with smooth health bars
+-- Strict-clean ESP with smooth health bars
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local cam = workspace.CurrentCamera
@@ -7,9 +7,10 @@ local plr = Players.LocalPlayer
 local ESP = {
     Enabled = false,
     Boxes = false,
-    BoxShift = CFrame.new(0, -1.5, 0),
-    BoxSize = Vector3.new(4, 6, 0),
-    Color = Color3.fromRGB(0, 255, 0),
+    HealthBars = false, -- toggle for health bars
+    BoxShift = CFrame.new(0,-1.5,0),
+    BoxSize = Vector3.new(4,6,0),
+    Color = Color3.fromRGB(0,255,0),
     FaceCamera = false,
     Names = false,
     TeamColor = false,
@@ -18,12 +19,12 @@ local ESP = {
     TeamMates = false,
     Players = false,
     Tracers = false,
-
+    
     Objects = setmetatable({}, {__mode="kv"}),
     Overrides = {},
     AutoRemove = true,
     Highlighted = nil,
-    HighlightColor = Color3.new(1, 1, 1)
+    HighlightColor = Color3.new(1,1,1)
 }
 
 -- utility
@@ -34,10 +35,10 @@ local function safeDisconnect(conn)
 end
 
 local function Draw(obj, props)
-    local ok, new = pcall(function() return Drawing.new(obj) end)
+    local ok,new = pcall(function() return Drawing.new(obj) end)
     if not ok or not new then return nil end
     props = props or {}
-    for i, v in pairs(props) do
+    for i,v in pairs(props) do
         pcall(function() new[i] = v end)
     end
     return new
@@ -72,7 +73,7 @@ end
 function ESP:Toggle(bool)
     self.Enabled = bool
     if not bool then
-        for obj, box in pairs(self.Objects) do
+        for obj,box in pairs(self.Objects) do
             if box and box.Remove then
                 pcall(function() box:Remove() end)
             end
@@ -88,14 +89,10 @@ end
 function ESP:Add(obj, options)
     if not obj then return end
     options = options or {}
-
     if not obj.Parent and not options.RenderInNil then return end
+    if self:GetBox(obj) then pcall(function() self:GetBox(obj):Remove() end) end
 
-    if self:GetBox(obj) then
-        pcall(function() self:GetBox(obj):Remove() end)
-    end
-
-    local primary = options.PrimaryPart or (obj.ClassName == "Model" and (obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildWhichIsA("BasePart"))) or (obj:IsA("BasePart") and obj)
+    local primary = options.PrimaryPart or (obj.ClassName=="Model" and (obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildWhichIsA("BasePart"))) or (obj:IsA("BasePart") and obj)
     local player = options.Player or Players:GetPlayerFromCharacter(obj)
     local color = options.Color or self:GetColor(obj)
 
@@ -113,96 +110,43 @@ function ESP:Add(obj, options)
         ColorDynamic = options.ColorDynamic,
         RenderInNil = options.RenderInNil,
         _conns = {},
-        HealthSmooth = 1 -- percentage (1 = full)
-    }, {__index = {} })
+        HealthSmooth = 1,
+        HealthAlpha = 1 -- smooth fade
+    }, {__index = {}})
 
     -- Quad
-    box.Components["Quad"] = Draw("Quad", {
-        Thickness = self.Thickness,
-        Color = box.Color,
-        Transparency = 1,
-        Filled = false,
-        Visible = self.Enabled and self.Boxes
-    })
+    box.Components["Quad"] = Draw("Quad",{Thickness=self.Thickness,Color=box.Color,Transparency=1,Filled=false,Visible=self.Enabled and self.Boxes})
     -- Name
-    box.Components["Name"] = Draw("Text", {
-        Text = box.Name,
-        Color = box.Color,
-        Center = true,
-        Outline = true,
-        Size = 19,
-        Visible = self.Enabled and self.Names
-    })
-    -- Distance
-    box.Components["Distance"] = Draw("Text", {
-        Color = box.Color,
-        Center = true,
-        Outline = true,
-        Size = 19,
-        Visible = self.Enabled and self.Names
-    })
-    -- Tracer
-    box.Components["Tracer"] = Draw("Line", {
-        Thickness = self.Thickness,
-        Color = box.Color,
-        Transparency = 1,
-        Visible = self.Enabled and self.Tracers
-    })
-    -- Health Bar BG
-    box.Components["HealthBG"] = Draw("Line", {
-        Thickness = 3,
-        Color = Color3.fromRGB(0,0,0),
-        Transparency = 1,
-        Visible = self.Enabled
-    })
-    -- Health Bar
-    box.Components["Health"] = Draw("Line", {
-        Thickness = 3,
-        Color = Color3.fromRGB(0,255,0),
-        Transparency = 1,
-        Visible = self.Enabled
-    })
+    box.Components["Name"] = Draw("Text",{Text=box.Name,Color=box.Color,Center=true,Outline=true,Size=19,Visible=self.Enabled and self.Names})
+    box.Components["Distance"] = Draw("Text",{Color=box.Color,Center=true,Outline=true,Size=19,Visible=self.Enabled and self.Names})
+    box.Components["Tracer"] = Draw("Line",{Thickness=self.Thickness,Color=box.Color,Transparency=1,Visible=self.Enabled and self.Tracers})
+    -- Health bar BG
+    box.Components["HealthBG"] = Draw("Line",{Thickness=3,Color=Color3.fromRGB(0,0,0),Transparency=1,Visible=self.Enabled and self.HealthBars})
+    -- Health bar
+    box.Components["Health"] = Draw("Line",{Thickness=3,Color=Color3.fromRGB(0,255,0),Transparency=1,Visible=self.Enabled and self.HealthBars})
 
-    -- store
     self.Objects[obj] = box
 
-    local function trackConnection(conn)
-        table.insert(box._conns, conn)
-        return conn
-    end
+    local function trackConnection(conn) table.insert(box._conns, conn); return conn end
 
     if obj and obj:IsA("Instance") then
-        trackConnection(obj.AncestryChanged:Connect(function(_, parent)
-            if not parent and ESP.AutoRemove ~= false then box:Remove() end
-        end))
-        trackConnection(obj:GetPropertyChangedSignal("Parent"):Connect(function()
-            if obj.Parent == nil and ESP.AutoRemove ~= false then box:Remove() end
-        end))
-        if obj.Destroying then
-            trackConnection(obj.Destroying:Connect(function() box:Remove() end))
-        end
+        trackConnection(obj.AncestryChanged:Connect(function(_, parent) if not parent and ESP.AutoRemove~=false then box:Remove() end end))
+        trackConnection(obj:GetPropertyChangedSignal("Parent"):Connect(function() if obj.Parent==nil and ESP.AutoRemove~=false then box:Remove() end end))
+        if obj.Destroying then trackConnection(obj.Destroying:Connect(function() box:Remove() end)) end
     end
 
     local hum = obj:FindFirstChildOfClass("Humanoid")
-    if hum then
-        trackConnection(hum.Died:Connect(function()
-            task.defer(function() if ESP.AutoRemove ~= false then box:Remove() end end)
-        end))
-    end
-
+    if hum then trackConnection(hum.Died:Connect(function() task.defer(function() if ESP.AutoRemove~=false then box:Remove() end end) end)) end
     if player then
-        trackConnection(player.CharacterRemoving:Connect(function(char)
-            if char == obj and ESP.AutoRemove ~= false then box:Remove() end
-        end))
+        trackConnection(player.CharacterRemoving:Connect(function(char) if char==obj and ESP.AutoRemove~=false then box:Remove() end end))
         trackConnection(Players.PlayerRemoving:Connect(function(rem)
-            if rem == player and ESP.AutoRemove ~= false then
+            if rem==player and ESP.AutoRemove~=false then
                 for o,b in pairs(ESP.Objects) do
-                    if b and b.Player == rem then pcall(function() b:Remove() end) end
+                    if b and b.Player==rem then pcall(function() b:Remove() end) end
                 end
             end
         end))
     end
-
     return box
 end
 
@@ -210,11 +154,10 @@ end
 local function CharAdded(char)
     local p = Players:GetPlayerFromCharacter(char)
     if not p then return end
-
     if not char:FindFirstChild("HumanoidRootPart") then
         local ev
         ev = char.ChildAdded:Connect(function(c)
-            if c.Name == "HumanoidRootPart" then
+            if c.Name=="HumanoidRootPart" then
                 safeDisconnect(ev)
                 ESP:Add(char,{Name=p.Name,Player=p,PrimaryPart=c})
             end
@@ -244,80 +187,79 @@ end
 RunService.RenderStepped:Connect(function()
     cam = workspace.CurrentCamera
     for _, box in pairs(ESP.Objects) do
-        if box then
-            -- Update logic
-            local primary = box.PrimaryPart
-            if not primary then box:Remove() continue end
+        if not box or not box.PrimaryPart then box:Remove() continue end
 
-            local cf = primary.CFrame
-            if ESP.FaceCamera then cf = CFrame.new(cf.p, cam.CFrame.p) end
-            local size = box.Size
-            local locs = {
-                TopLeft = cf * ESP.BoxShift * CFrame.new(size.X/2,size.Y/2,0),
-                TopRight = cf * ESP.BoxShift * CFrame.new(-size.X/2,size.Y/2,0),
-                BottomLeft = cf * ESP.BoxShift * CFrame.new(size.X/2,-size.Y/2,0),
-                BottomRight = cf * ESP.BoxShift * CFrame.new(-size.X/2,-size.Y/2,0),
-                TagPos = cf * ESP.BoxShift * CFrame.new(0,size.Y/2,0),
-                Torso = cf * ESP.BoxShift
-            }
+        local cf = box.PrimaryPart.CFrame
+        if ESP.FaceCamera then cf=CFrame.new(cf.p, cam.CFrame.p) end
+        local size = box.Size
+        local locs = {
+            TopLeft = cf*ESP.BoxShift*CFrame.new(size.X/2,size.Y/2,0),
+            TopRight = cf*ESP.BoxShift*CFrame.new(-size.X/2,size.Y/2,0),
+            BottomLeft = cf*ESP.BoxShift*CFrame.new(size.X/2,-size.Y/2,0),
+            BottomRight = cf*ESP.BoxShift*CFrame.new(-size.X/2,-size.Y/2,0),
+            TagPos = cf*ESP.BoxShift*CFrame.new(0,size.Y/2,0),
+            Torso = cf*ESP.BoxShift
+        }
 
-            -- Quad box
-            if ESP.Boxes and box.Components.Quad then
-                local TL,Vis1 = cam:WorldToViewportPoint(locs.TopLeft.p)
-                local TR,Vis2 = cam:WorldToViewportPoint(locs.TopRight.p)
-                local BL,Vis3 = cam:WorldToViewportPoint(locs.BottomLeft.p)
-                local BR,Vis4 = cam:WorldToViewportPoint(locs.BottomRight.p)
-                if Vis1 or Vis2 or Vis3 or Vis4 then
-                    box.Components.Quad.Visible = true
-                    box.Components.Quad.PointA = Vector2.new(TR.X,TR.Y)
-                    box.Components.Quad.PointB = Vector2.new(TL.X,TL.Y)
-                    box.Components.Quad.PointC = Vector2.new(BL.X,BL.Y)
-                    box.Components.Quad.PointD = Vector2.new(BR.X,BR.Y)
-                    box.Components.Quad.Color = box.Color
-                else box.Components.Quad.Visible = false end
+        -- Quad
+        if ESP.Boxes and box.Components.Quad then
+            local TL,Vis1 = cam:WorldToViewportPoint(locs.TopLeft.p)
+            local TR,Vis2 = cam:WorldToViewportPoint(locs.TopRight.p)
+            local BL,Vis3 = cam:WorldToViewportPoint(locs.BottomLeft.p)
+            local BR,Vis4 = cam:WorldToViewportPoint(locs.BottomRight.p)
+            if Vis1 or Vis2 or Vis3 or Vis4 then
+                box.Components.Quad.Visible = true
+                box.Components.Quad.PointA = Vector2.new(TR.X,TR.Y)
+                box.Components.Quad.PointB = Vector2.new(TL.X,TL.Y)
+                box.Components.Quad.PointC = Vector2.new(BL.X,BL.Y)
+                box.Components.Quad.PointD = Vector2.new(BR.X,BR.Y)
+                box.Components.Quad.Color = box.Color
+            else box.Components.Quad.Visible = false end
+        end
+
+        -- Names & distance
+        if ESP.Names and box.Components.Name and box.Components.Distance then
+            local TagPos,Vis = cam:WorldToViewportPoint(locs.TagPos.p)
+            if Vis then
+                box.Components.Name.Visible = true
+                box.Components.Name.Position = Vector2.new(TagPos.X,TagPos.Y)
+                box.Components.Name.Text = box.Name
+                box.Components.Distance.Visible = true
+                box.Components.Distance.Position = Vector2.new(TagPos.X,TagPos.Y+14)
+                box.Components.Distance.Text = math.floor((cam.CFrame.p-cf.p).Magnitude).."m away"
+            else
+                box.Components.Name.Visible=false
+                box.Components.Distance.Visible=false
             end
+        end
 
-            -- Names & distance
-            if ESP.Names and box.Components.Name and box.Components.Distance then
-                local TagPos, Vis = cam:WorldToViewportPoint(locs.TagPos.p)
-                if Vis then
-                    box.Components.Name.Visible = true
-                    box.Components.Name.Position = Vector2.new(TagPos.X, TagPos.Y)
-                    box.Components.Name.Text = box.Name
-                    box.Components.Distance.Visible = true
-                    box.Components.Distance.Position = Vector2.new(TagPos.X, TagPos.Y + 14)
-                    box.Components.Distance.Text = math.floor((cam.CFrame.p - cf.p).Magnitude).."m away"
-                else
-                    box.Components.Name.Visible = false
-                    box.Components.Distance.Visible = false
-                end
-            end
+        -- Smooth Health Bars
+        local hum = box.Object:FindFirstChildOfClass("Humanoid")
+        if hum and box.Components.Health and box.Components.HealthBG then
+            local percent = math.clamp(hum.Health/hum.MaxHealth,0,1)
+            box.HealthSmooth = box.HealthSmooth + (percent-box.HealthSmooth)*0.1
 
-            -- Smooth Health Bar
-            local hum = box.Object:FindFirstChildOfClass("Humanoid")
-            if hum and box.Components.Health and box.Components.HealthBG then
-                local percent = math.clamp(hum.Health/hum.MaxHealth,0,1)
-                -- interpolate
-                box.HealthSmooth = box.HealthSmooth + (percent - box.HealthSmooth)*0.1
+            local targetAlpha = (ESP.Enabled and ESP.HealthBars) and 1 or 0
+            box.HealthAlpha = box.HealthAlpha + (targetAlpha-box.HealthAlpha)*0.1
 
-                local TL,BL = cam:WorldToViewportPoint(locs.TopLeft.p), cam:WorldToViewportPoint(locs.BottomLeft.p)
-                local top = Vector2.new(TL.X - 6, TL.Y)
-                local bottom = Vector2.new(BL.X - 6, BL.Y)
-                -- bg
-                box.Components.HealthBG.Visible = true
-                box.Components.HealthBG.From = top
-                box.Components.HealthBG.To = bottom
-                -- health
-                box.Components.Health.Visible = true
-                local height = bottom.Y - top.Y
-                local newY = bottom.Y - (height * box.HealthSmooth)
-                box.Components.Health.From = Vector2.new(top.X, bottom.Y)
-                box.Components.Health.To = Vector2.new(top.X, newY)
-                box.Components.Health.Color = Color3.fromRGB(255*(1-box.HealthSmooth), 255*box.HealthSmooth, 0)
-            elseif box.Components.Health then
-                box.Components.Health.Visible = false
-                box.Components.HealthBG.Visible = false
-            end
+            local TL,BL = cam:WorldToViewportPoint(locs.TopLeft.p), cam:WorldToViewportPoint(locs.BottomLeft.p)
+            local top = Vector2.new(TL.X-6,TL.Y)
+            local bottom = Vector2.new(BL.X-6,BL.Y)
+
+            box.Components.HealthBG.Visible = box.HealthAlpha>0
+            box.Components.HealthBG.From = top
+            box.Components.HealthBG.To = bottom
+            box.Components.HealthBG.Color = Color3.fromRGB(0,0,0)
+
+            box.Components.Health.Visible = box.HealthAlpha>0
+            local height = bottom.Y-top.Y
+            local newY = bottom.Y-(height*box.HealthSmooth)
+            box.Components.Health.From = Vector2.new(top.X,bottom.Y)
+            box.Components.Health.To = Vector2.new(top.X,newY)
+            box.Components.Health.Color = Color3.fromRGB(255*(1-box.HealthSmooth),255*box.HealthSmooth,0):Lerp(Color3.new(0,0,0),1-box.HealthAlpha)
+        elseif box.Components.Health then
+            box.Components.Health.Visible=false
+            box.Components.HealthBG.Visible=false
         end
     end
 end)
