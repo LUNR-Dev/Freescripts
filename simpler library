@@ -1,4 +1,4 @@
--- ESP Library
+-- ESP Library with Distance-Based Scaling
 -- Usage:
 -- local lib = loadstring(game:HttpGet("YOUR_URL_HERE"))()
 -- lib.boxESP = true
@@ -100,9 +100,11 @@ end
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
--- --- Render Loop --- --
+-- --- Render Loop with Distance Scaling --- --
 RunService.RenderStepped:Connect(function()
     local camera = Workspace.CurrentCamera
+    local camPos = camera.CFrame.Position
+
     for character, box in pairs(BoxESPBoxes) do
         if ESPSettings.boxESP and character and character:FindFirstChild("HumanoidRootPart") then
             local hrp = character.HumanoidRootPart
@@ -116,10 +118,14 @@ RunService.RenderStepped:Connect(function()
 
                 if topOnScreen and bottomOnScreen then
                     box.Visible = true
-                    -- Width based on torso size + padding
-                    local width = (torso.Size.X + 1) * 20
-                    -- Height based on projected top and bottom + padding
-                    local height = (bottomPos.Y - topPos.Y) * 1.1
+
+                    -- Distance scaling
+                    local distance = (hrp.Position - camPos).Magnitude
+                    local scale = math.clamp(500 / distance, 0.5, 5) -- closer = bigger, further = smaller
+
+                    local width = (torso.Size.X + 1) * 20 * scale
+                    local height = (bottomPos.Y - topPos.Y) * 1.1 * scale
+
                     box.Position = Vector2.new(topPos.X - width / 2, topPos.Y)
                     box.Size = Vector2.new(width, height)
                 else
@@ -131,13 +137,20 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Name ESP
+    -- Name ESP with distance scaling
     for character, label in pairs(NameESPLabels) do
         if ESPSettings.nameESP and character and character:FindFirstChild("Head") then
             local head = character.Head
             local pos, onScreen = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
+
             if onScreen then
                 label.Visible = true
+
+                -- Distance scaling
+                local distance = (head.Position - camPos).Magnitude
+                local scale = math.clamp(500 / distance, 0.5, 5) -- same scale factor
+                label.Size = 16 * scale
+
                 label.Position = Vector2.new(pos.X, pos.Y)
             else
                 label.Visible = false
