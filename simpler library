@@ -1,8 +1,4 @@
--- ESP Library
--- Usage:
--- local lib = loadstring(game:HttpGet("YOUR_URL_HERE"))()
--- lib.boxESP = true
--- lib.nameESP = true
+
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -102,26 +98,37 @@ Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
 -- --- Render Loop --- --
 RunService.RenderStepped:Connect(function()
+    local camera = Workspace.CurrentCamera
     for character, box in pairs(BoxESPBoxes) do
         if ESPSettings.boxESP and character and character:FindFirstChild("HumanoidRootPart") then
             local hrp = character.HumanoidRootPart
-            local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(hrp.Position)
-            if onScreen then
-                box.Visible = true
-                box.Position = Vector2.new(pos.X - 25, pos.Y - 50)
-                box.Size = Vector2.new(50, 100)
-            else
-                box.Visible = false
+            local humanoid = character:FindFirstChild("Humanoid")
+            
+            if humanoid then
+                -- Get top and bottom of character for box
+                local topPos, topOnScreen = camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, humanoid.HipHeight + 1, 0))
+                local bottomPos, bottomOnScreen = camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, humanoid.HipHeight, 0))
+                
+                if topOnScreen and bottomOnScreen then
+                    box.Visible = true
+                    local height = (bottomPos.Y - topPos.Y) * 1.1 -- add padding
+                    local width = humanoid.HipWidth * 40       -- scale width with some padding
+                    box.Position = Vector2.new(topPos.X - width / 2, topPos.Y)
+                    box.Size = Vector2.new(width, height)
+                else
+                    box.Visible = false
+                end
             end
         else
             if box then box.Visible = false end
         end
     end
 
+    -- Name ESP
     for character, label in pairs(NameESPLabels) do
         if ESPSettings.nameESP and character and character:FindFirstChild("Head") then
             local head = character.Head
-            local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
+            local pos, onScreen = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
             if onScreen then
                 label.Visible = true
                 label.Position = Vector2.new(pos.X, pos.Y)
