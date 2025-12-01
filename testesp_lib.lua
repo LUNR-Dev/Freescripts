@@ -2,7 +2,7 @@
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local Drawing = Drawing -- assume Drawing library is available
+local Drawing = Drawing -- Assume Drawing is available
 
 local ESP = {}
 ESP.__index = ESP
@@ -15,7 +15,7 @@ ESP.BoxThickness = 2
 ESP.BoxSize = Vector3.new(4,6,0)
 ESP.Objects = setmetatable({}, {__mode="kv"})
 
--- Utility function to create a drawing box
+-- Utility function to create a box
 local function DrawBox()
     local box = Drawing.new("Quad")
     box.Visible = false
@@ -29,40 +29,36 @@ end
 function ESP.AddPlayer(player)
     if not player then return end
 
-    local function CharacterAdded(char)
-        local hrp = char:WaitForChild("HumanoidRootPart", 5)
-        if not hrp then return end
-
+    local function TrackCharacter(char)
         -- Remove old box if it exists
         if ESP.Objects[player] and ESP.Objects[player].Box then
             ESP.Objects[player].Box.Visible = false
         end
 
-        local box = DrawBox()
-        ESP.Objects[player] = {Box = box, Target = hrp}
-
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.Died:Connect(function()
-                box.Visible = false
-            end)
+        -- Find PrimaryPart (HumanoidRootPart or fallback)
+        local function GetPrimaryPart()
+            return char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart or char:FindFirstChildWhichIsA("BasePart")
         end
 
-        -- Remove box if character leaves
+        local box = DrawBox()
+        ESP.Objects[player] = {Box = box, Character = char, GetPrimaryPart = GetPrimaryPart}
+
+        -- Remove box if character is completely gone
         char.AncestryChanged:Connect(function(_, parent)
             if not parent then
                 box.Visible = false
+                ESP.Objects[player] = nil
             end
         end)
     end
 
     if player.Character then
-        CharacterAdded(player.Character)
+        TrackCharacter(player.Character)
     end
-    player.CharacterAdded:Connect(CharacterAdded)
+    player.CharacterAdded:Connect(TrackCharacter)
 end
 
--- Remove all ESP boxes (main switch off)
+-- Remove all ESP boxes
 function ESP.ClearAll()
     for _, obj in pairs(ESP.Objects) do
         if obj.Box then
@@ -85,7 +81,7 @@ function ESP.SetEnabled(enabled)
     end
 end
 
--- Box ESP toggle (just hide/show)
+-- Box ESP toggle
 function ESP.SetBoxes(enabled)
     ESP.Boxes = enabled
     for _, data in pairs(ESP.Objects) do
@@ -102,33 +98,41 @@ Players.PlayerAdded:Connect(function(player)
     end
 end)
 
--- Smooth update loop (always updates box positions if Boxes enabled)
+-- Smooth update loop (always updates boxes when enabled)
 RunService.RenderStepped:Connect(function()
-    if not ESP.Enabled then return end
+    if not ESP.Enabled or not ESP.Boxes then return end
     local cam = Workspace.CurrentCamera
+
     for player, data in pairs(ESP.Objects) do
-        local box, hrp = data.Box, data.Target
-        if box and hrp and hrp.Parent then
-            local cf = hrp.CFrame
-            local size = ESP.BoxSize
-            local topLeft = cf*CFrame.new(size.X/2,size.Y/2,0)
-            local topRight = cf*CFrame.new(-size.X/2,size.Y/2,0)
-            local bottomLeft = cf*CFrame.new(size.X/2,-size.Y/2,0)
-            local bottomRight = cf*CFrame.new(-size.X/2,-size.Y/2,0)
+        local box = data.Box
+        local char = data.Character
+        if not box or not char or not char.Parent then
+            box.Visible = false
+            ESP.Objects[player] = nil
+        else
+            local primaryPart = data.GetPrimaryPart()
+            if primaryPart then
+                local cf = primaryPart.CFrame
+                local size = ESP.BoxSize
+                local topLeft = cf*CFrame.new(size.X/2,size.Y/2,0)
+                local topRight = cf*CFrame.new(-size.X/2,size.Y/2,0)
+                local bottomLeft = cf*CFrame.new(size.X/2,-size.Y/2,0)
+                local bottomRight = cf*CFrame.new(-size.X/2,-size.Y/2,0)
 
-            local tl, visible1 = cam:WorldToViewportPoint(topLeft.Position)
-            local tr, visible2 = cam:WorldToViewportPoint(topRight.Position)
-            local bl, visible3 = cam:WorldToViewportPoint(bottomLeft.Position)
-            local br, visible4 = cam:WorldToViewportPoint(bottomRight.Position)
+                local tl, visible1 = cam:WorldToViewportPoint(topLeft.Position)
+                local tr, visible2 = cam:WorldToViewportPoint(topRight.Position)
+                local bl, visible3 = cam:WorldToViewportPoint(bottomLeft.Position)
+                local br, visible4 = cam:WorldToViewportPoint(bottomRight.Position)
 
-            -- Only show box if Boxes are enabled
-            box.Visible = (visible1 or visible2 or visible3 or visible4) and ESP.Boxes
-
-            if box.Visible then
-                box.PointA = Vector2.new(tr.X, tr.Y)
-                box.PointB = Vector2.new(tl.X, tl.Y)
-                box.PointC = Vector2.new(bl.X, bl.Y)
-                box.PointD = Vector2.new(br.X, br.Y)
+                box.Visible = (visible1 or visible2 or visible3 or visible4) and ESP.Boxes
+                if box.Visible then
+                    box.PointA = Vector2.new(tr.X, tr.Y)
+                    box.PointB = Vector2.new(tl.X, tl.Y)
+                    box.PointC = Vector2.new(bl.X, bl.Y)
+                    box.PointD = Vector2.new(br.X, br.Y)
+                end
+            else
+                box.Visible = false
             end
         end
     end
