@@ -9,7 +9,7 @@ ESP.__index = ESP
 
 -- Settings
 ESP.Enabled = false      -- Main switch
-ESP.Boxes = false         -- Box ESP toggle
+ESP.Boxes = true         -- Box ESP toggle
 ESP.BoxColor = Color3.fromRGB(0, 255, 0)
 ESP.BoxThickness = 2
 ESP.BoxSize = Vector3.new(4,6,0)
@@ -25,14 +25,6 @@ local function DrawBox()
     return box
 end
 
--- Remove a box safely
-local function RemoveBox(box)
-    if box then
-        box.Visible = false
-        box:Remove()
-    end
-end
-
 -- Add a player to ESP
 function ESP.AddPlayer(player)
     if not player then return end
@@ -41,20 +33,25 @@ function ESP.AddPlayer(player)
         local hrp = char:WaitForChild("HumanoidRootPart", 5)
         if not hrp then return end
 
+        -- Remove old box if it exists
+        if ESP.Objects[player] and ESP.Objects[player].Box then
+            ESP.Objects[player].Box.Visible = false
+        end
+
         local box = DrawBox()
         ESP.Objects[player] = {Box = box, Target = hrp}
 
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then
             hum.Died:Connect(function()
-                RemoveBox(box)
-                ESP.Objects[player] = nil
+                box.Visible = false
             end)
         end
+
+        -- Remove box if character leaves
         char.AncestryChanged:Connect(function(_, parent)
             if not parent then
-                RemoveBox(box)
-                ESP.Objects[player] = nil
+                box.Visible = false
             end
         end)
     end
@@ -65,14 +62,13 @@ function ESP.AddPlayer(player)
     player.CharacterAdded:Connect(CharacterAdded)
 end
 
--- Remove all ESP boxes
+-- Remove all ESP boxes (main switch off)
 function ESP.ClearAll()
     for _, obj in pairs(ESP.Objects) do
         if obj.Box then
-            RemoveBox(obj.Box)
+            obj.Box.Visible = false
         end
     end
-    ESP.Objects = setmetatable({}, {__mode="kv"})
 end
 
 -- Main ESP toggle
@@ -89,14 +85,12 @@ function ESP.SetEnabled(enabled)
     end
 end
 
--- Box ESP toggle
+-- Box ESP toggle (just hide/show)
 function ESP.SetBoxes(enabled)
     ESP.Boxes = enabled
-    if not enabled then
-        for _, data in pairs(ESP.Objects) do
-            if data.Box then
-                RemoveBox(data.Box)
-            end
+    for _, data in pairs(ESP.Objects) do
+        if data.Box then
+            data.Box.Visible = enabled
         end
     end
 end
@@ -108,11 +102,11 @@ Players.PlayerAdded:Connect(function(player)
     end
 end)
 
--- Smooth update loop
+-- Smooth update loop (always updates box positions if Boxes enabled)
 RunService.RenderStepped:Connect(function()
-    if not ESP.Enabled or not ESP.Boxes then return end
+    if not ESP.Enabled then return end
     local cam = Workspace.CurrentCamera
-    for _, data in pairs(ESP.Objects) do
+    for player, data in pairs(ESP.Objects) do
         local box, hrp = data.Box, data.Target
         if box and hrp and hrp.Parent then
             local cf = hrp.CFrame
@@ -127,7 +121,9 @@ RunService.RenderStepped:Connect(function()
             local bl, visible3 = cam:WorldToViewportPoint(bottomLeft.Position)
             local br, visible4 = cam:WorldToViewportPoint(bottomRight.Position)
 
-            box.Visible = visible1 or visible2 or visible3 or visible4
+            -- Only show box if Boxes are enabled
+            box.Visible = (visible1 or visible2 or visible3 or visible4) and ESP.Boxes
+
             if box.Visible then
                 box.PointA = Vector2.new(tr.X, tr.Y)
                 box.PointB = Vector2.new(tl.X, tl.Y)
