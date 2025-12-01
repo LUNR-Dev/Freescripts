@@ -43,7 +43,7 @@ function ESP.AddPlayer(player)
         local box = DrawBox()
         ESP.Objects[player] = {Box = box, Character = char, GetPrimaryPart = GetPrimaryPart}
 
-        -- Remove box if character is completely gone
+        -- Remove box if character leaves workspace
         char.AncestryChanged:Connect(function(_, parent)
             if not parent then
                 box.Visible = false
@@ -86,7 +86,7 @@ function ESP.SetBoxes(enabled)
     ESP.Boxes = enabled
     for _, data in pairs(ESP.Objects) do
         if data.Box then
-            data.Box.Visible = enabled
+            data.Box.Visible = enabled and ESP.Enabled
         end
     end
 end
@@ -98,38 +98,43 @@ Players.PlayerAdded:Connect(function(player)
     end
 end)
 
--- Smooth update loop (always updates boxes when enabled)
+-- Smooth update loop (always updates boxes, even if hidden)
 RunService.RenderStepped:Connect(function()
-    if not ESP.Enabled or not ESP.Boxes then return end
     local cam = Workspace.CurrentCamera
 
     for player, data in pairs(ESP.Objects) do
         local box = data.Box
         local char = data.Character
         if not box or not char or not char.Parent then
-            box.Visible = false
+            if box then box.Visible = false end
             ESP.Objects[player] = nil
         else
             local primaryPart = data.GetPrimaryPart()
             if primaryPart then
-                local cf = primaryPart.CFrame
-                local size = ESP.BoxSize
-                local topLeft = cf*CFrame.new(size.X/2,size.Y/2,0)
-                local topRight = cf*CFrame.new(-size.X/2,size.Y/2,0)
-                local bottomLeft = cf*CFrame.new(size.X/2,-size.Y/2,0)
-                local bottomRight = cf*CFrame.new(-size.X/2,-size.Y/2,0)
+                if ESP.Enabled and ESP.Boxes then
+                    box.Visible = true
+                    local cf = primaryPart.CFrame
+                    local size = ESP.BoxSize
+                    local topLeft = cf*CFrame.new(size.X/2,size.Y/2,0)
+                    local topRight = cf*CFrame.new(-size.X/2,size.Y/2,0)
+                    local bottomLeft = cf*CFrame.new(size.X/2,-size.Y/2,0)
+                    local bottomRight = cf*CFrame.new(-size.X/2,-size.Y/2,0)
 
-                local tl, visible1 = cam:WorldToViewportPoint(topLeft.Position)
-                local tr, visible2 = cam:WorldToViewportPoint(topRight.Position)
-                local bl, visible3 = cam:WorldToViewportPoint(bottomLeft.Position)
-                local br, visible4 = cam:WorldToViewportPoint(bottomRight.Position)
+                    local tl, visible1 = cam:WorldToViewportPoint(topLeft.Position)
+                    local tr, visible2 = cam:WorldToViewportPoint(topRight.Position)
+                    local bl, visible3 = cam:WorldToViewportPoint(bottomLeft.Position)
+                    local br, visible4 = cam:WorldToViewportPoint(bottomRight.Position)
 
-                box.Visible = (visible1 or visible2 or visible3 or visible4) and ESP.Boxes
-                if box.Visible then
-                    box.PointA = Vector2.new(tr.X, tr.Y)
-                    box.PointB = Vector2.new(tl.X, tl.Y)
-                    box.PointC = Vector2.new(bl.X, bl.Y)
-                    box.PointD = Vector2.new(br.X, br.Y)
+                    box.Visible = (visible1 or visible2 or visible3 or visible4)
+                    if box.Visible then
+                        box.PointA = Vector2.new(tr.X, tr.Y)
+                        box.PointB = Vector2.new(tl.X, tl.Y)
+                        box.PointC = Vector2.new(bl.X, bl.Y)
+                        box.PointD = Vector2.new(br.X, br.Y)
+                    end
+                else
+                    -- If ESP or Boxes are disabled, hide the box
+                    box.Visible = false
                 end
             else
                 box.Visible = false
