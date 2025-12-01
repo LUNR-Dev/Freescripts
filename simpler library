@@ -1,4 +1,8 @@
-
+-- ESP Library
+-- Usage:
+-- local lib = loadstring(game:HttpGet("YOUR_URL_HERE"))()
+-- lib.boxESP = true
+-- lib.nameESP = true
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -102,17 +106,20 @@ RunService.RenderStepped:Connect(function()
     for character, box in pairs(BoxESPBoxes) do
         if ESPSettings.boxESP and character and character:FindFirstChild("HumanoidRootPart") then
             local hrp = character.HumanoidRootPart
-            local humanoid = character:FindFirstChild("Humanoid")
+            local head = character:FindFirstChild("Head")
+            local torso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
             
-            if humanoid then
-                -- Get top and bottom of character for box
-                local topPos, topOnScreen = camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, humanoid.HipHeight + 1, 0))
-                local bottomPos, bottomOnScreen = camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, humanoid.HipHeight, 0))
-                
+            if head and torso then
+                -- Top and bottom positions
+                local topPos, topOnScreen = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                local bottomPos, bottomOnScreen = camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 0.5, 0))
+
                 if topOnScreen and bottomOnScreen then
                     box.Visible = true
-                    local height = (bottomPos.Y - topPos.Y) * 1.1 -- add padding
-                    local width = humanoid.HipWidth * 40       -- scale width with some padding
+                    -- Width based on torso size + padding
+                    local width = (torso.Size.X + 1) * 20
+                    -- Height based on projected top and bottom + padding
+                    local height = (bottomPos.Y - topPos.Y) * 1.1
                     box.Position = Vector2.new(topPos.X - width / 2, topPos.Y)
                     box.Size = Vector2.new(width, height)
                 else
