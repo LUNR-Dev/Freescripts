@@ -1,4 +1,4 @@
--- ESP Library with Distance-Based Scaling
+-- ESP Library with FOV-Based Scaling
 -- Usage:
 -- local lib = loadstring(game:HttpGet("YOUR_URL_HERE"))()
 -- lib.boxESP = true
@@ -100,57 +100,40 @@ end
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
--- --- Render Loop with Distance Scaling --- --
+-- --- Render Loop with FOV-Based Scaling --- --
 RunService.RenderStepped:Connect(function()
     local camera = Workspace.CurrentCamera
-    local camPos = camera.CFrame.Position
 
     for character, box in pairs(BoxESPBoxes) do
         if ESPSettings.boxESP and character and character:FindFirstChild("HumanoidRootPart") then
             local hrp = character.HumanoidRootPart
-            local head = character:FindFirstChild("Head")
-            local torso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+            local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
             
-            if head and torso then
-                -- Top and bottom positions
-                local topPos, topOnScreen = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                local bottomPos, bottomOnScreen = camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 0.5, 0))
+            if onScreen then
+                -- Use the FOV scaling formula
+                local scale = 1 / (pos.Z * math.tan(math.rad(camera.FieldOfView * 0.5)) * 2) * 1000
+                local width, height = math.floor(4.5 * scale), math.floor(6 * scale)
+                local x, y = math.floor(pos.X), math.floor(pos.Y)
+                local xPosition, yPosition = math.floor(x - width * 0.5), math.floor((y - height * 0.5) + (0.5 * scale))
 
-                if topOnScreen and bottomOnScreen then
-                    box.Visible = true
-
-                    -- Distance scaling
-                    local distance = (hrp.Position - camPos).Magnitude
-                    local scale = math.clamp(500 / distance, 0.5, 5) -- closer = bigger, further = smaller
-
-                    local width = (torso.Size.X + 1) * 20 * scale
-                    local height = (bottomPos.Y - topPos.Y) * 1.1 * scale
-
-                    box.Position = Vector2.new(topPos.X - width / 2, topPos.Y)
-                    box.Size = Vector2.new(width, height)
-                else
-                    box.Visible = false
-                end
+                box.Visible = true
+                box.Position = Vector2.new(xPosition, yPosition)
+                box.Size = Vector2.new(width, height)
+            else
+                box.Visible = false
             end
         else
             if box then box.Visible = false end
         end
     end
 
-    -- Name ESP with distance scaling
+    -- Name ESP
     for character, label in pairs(NameESPLabels) do
         if ESPSettings.nameESP and character and character:FindFirstChild("Head") then
             local head = character.Head
             local pos, onScreen = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
-
             if onScreen then
                 label.Visible = true
-
-                -- Distance scaling
-                local distance = (head.Position - camPos).Magnitude
-                local scale = math.clamp(500 / distance, 0.5, 5) -- same scale factor
-                label.Size = 16 * scale
-
                 label.Position = Vector2.new(pos.X, pos.Y)
             else
                 label.Visible = false
