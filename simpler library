@@ -1,42 +1,46 @@
--- ESP Library with Team Check
+-- ESP Library with Color Customization
 -- Usage:
 -- local lib = loadstring(game:HttpGet("YOUR_URL_HERE"))()
 -- lib.boxESP = true
 -- lib.nameESP = true
 -- lib.teamCheck = true
+-- lib.masterColor = true
+-- lib.boxColor = Color3.fromRGB(255,0,0)
+-- lib.nameColor = Color3.fromRGB(255,255,255)
+-- lib.mainColor = Color3.fromRGB(0,255,0)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
--- Main library table
 local ESP = {}
 
--- Setup getgenv variables
+-- getgenv settings
 getgenv().ESPSettings = getgenv().ESPSettings or {}
 ESPSettings.boxESP = ESPSettings.boxESP or false
 ESPSettings.nameESP = ESPSettings.nameESP or false
-ESPSettings.teamCheck = ESPSettings.teamCheck or false  -- team check toggle
+ESPSettings.teamCheck = ESPSettings.teamCheck or false
+ESPSettings.masterColor = ESPSettings.masterColor or false
+ESPSettings.boxColor = ESPSettings.boxColor or Color3.fromRGB(255,0,0)
+ESPSettings.nameColor = ESPSettings.nameColor or Color3.fromRGB(255,255,255)
+ESPSettings.mainColor = ESPSettings.mainColor or Color3.fromRGB(0,255,0)
 
--- Tables to store ESP drawings
+-- Tables for ESP drawings
 local BoxESPBoxes = {}
 local NameESPLabels = {}
 
--- --- Helper Functions --- --
-
--- Create Box ESP for a character
+-- --- Helper Functions ---
 local function CreateBox(character)
     if not character or not character:FindFirstChild("HumanoidRootPart") then return end
     local box = Drawing.new("Square")
     box.Visible = false
     box.Thickness = 2
-    box.Color = Color3.fromRGB(255, 0, 0)
+    box.Color = ESPSettings.boxColor
     box.Filled = false
     box.Transparency = 1
     BoxESPBoxes[character] = box
 end
 
--- Remove Box ESP
 local function RemoveBox(character)
     if BoxESPBoxes[character] then
         BoxESPBoxes[character]:Remove()
@@ -44,20 +48,18 @@ local function RemoveBox(character)
     end
 end
 
--- Create Name ESP for a character
 local function CreateName(character)
     if not character or not character:FindFirstChild("Head") then return end
-    local nameLabel = Drawing.new("Text")
-    nameLabel.Visible = false
-    nameLabel.Color = Color3.fromRGB(255, 255, 255)
-    nameLabel.Size = 16
-    nameLabel.Center = true
-    nameLabel.Outline = true
-    nameLabel.Text = character.Name
-    NameESPLabels[character] = nameLabel
+    local label = Drawing.new("Text")
+    label.Visible = false
+    label.Color = ESPSettings.nameColor
+    label.Size = 16
+    label.Center = true
+    label.Outline = true
+    label.Text = character.Name
+    NameESPLabels[character] = label
 end
 
--- Remove Name ESP
 local function RemoveName(character)
     if NameESPLabels[character] then
         NameESPLabels[character]:Remove()
@@ -65,7 +67,6 @@ local function RemoveName(character)
     end
 end
 
--- Check if a player is an enemy (team check)
 local function IsEnemy(player)
     if not ESPSettings.teamCheck then return true end
     local localPlayer = Players.LocalPlayer
@@ -74,7 +75,7 @@ local function IsEnemy(player)
     return player.Team ~= localPlayer.Team
 end
 
--- Handle character added
+-- --- Player Events ---
 local function OnCharacterAdded(character)
     CreateBox(character)
     CreateName(character)
@@ -88,7 +89,6 @@ local function OnCharacterAdded(character)
     end
 end
 
--- Handle player added
 local function OnPlayerAdded(player)
     player.CharacterAdded:Connect(OnCharacterAdded)
     if player.Character then
@@ -96,7 +96,6 @@ local function OnPlayerAdded(player)
     end
 end
 
--- Handle player leaving
 local function OnPlayerRemoving(player)
     if player.Character then
         RemoveBox(player.Character)
@@ -104,23 +103,20 @@ local function OnPlayerRemoving(player)
     end
 end
 
--- Connect events for all players
 for _, player in pairs(Players:GetPlayers()) do
     OnPlayerAdded(player)
 end
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
--- --- Render Loop with Team Check --- --
+-- --- Render Loop ---
 RunService.RenderStepped:Connect(function()
     local camera = Workspace.CurrentCamera
-
     for character, box in pairs(BoxESPBoxes) do
         local player = Players:GetPlayerFromCharacter(character)
         if player and ESPSettings.boxESP and IsEnemy(player) and character:FindFirstChild("HumanoidRootPart") then
             local hrp = character.HumanoidRootPart
             local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
-            
             if onScreen then
                 -- FOV-based scaling
                 local scale = 1 / (pos.Z * math.tan(math.rad(camera.FieldOfView * 0.5)) * 2) * 1000
@@ -131,6 +127,9 @@ RunService.RenderStepped:Connect(function()
                 box.Visible = true
                 box.Position = Vector2.new(xPosition, yPosition)
                 box.Size = Vector2.new(width, height)
+
+                -- Color
+                box.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor
             else
                 box.Visible = false
             end
@@ -139,7 +138,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Name ESP
     for character, label in pairs(NameESPLabels) do
         local player = Players:GetPlayerFromCharacter(character)
         if player and ESPSettings.nameESP and IsEnemy(player) and character:FindFirstChild("Head") then
@@ -148,6 +146,7 @@ RunService.RenderStepped:Connect(function()
             if onScreen then
                 label.Visible = true
                 label.Position = Vector2.new(pos.X, pos.Y)
+                label.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.nameColor
             else
                 label.Visible = false
             end
@@ -157,30 +156,18 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- --- Library Functions --- --
+-- --- Library Functions ---
+function ESP:SetBoxESP(bool) ESPSettings.boxESP = bool end
+function ESP:SetNameESP(bool) ESPSettings.nameESP = bool end
+function ESP:SetTeamCheck(bool) ESPSettings.teamCheck = bool end
+function ESP:SetMasterColor(bool) ESPSettings.masterColor = bool end
+function ESP:SetBoxColor(color) ESPSettings.boxColor = color end
+function ESP:SetNameColor(color) ESPSettings.nameColor = color end
+function ESP:SetMainColor(color) ESPSettings.mainColor = color end
 
-function ESP:SetBoxESP(bool)
-    ESPSettings.boxESP = bool
-end
-
-function ESP:SetNameESP(bool)
-    ESPSettings.nameESP = bool
-end
-
-function ESP:SetTeamCheck(bool)
-    ESPSettings.teamCheck = bool
-end
-
-function ESP:ToggleBoxESP()
-    ESPSettings.boxESP = not ESPSettings.boxESP
-end
-
-function ESP:ToggleNameESP()
-    ESPSettings.nameESP = not ESPSettings.nameESP
-end
-
-function ESP:ToggleTeamCheck()
-    ESPSettings.teamCheck = not ESPSettings.teamCheck
-end
+function ESP:ToggleBoxESP() ESPSettings.boxESP = not ESPSettings.boxESP end
+function ESP:ToggleNameESP() ESPSettings.nameESP = not ESPSettings.nameESP end
+function ESP:ToggleTeamCheck() ESPSettings.teamCheck = not ESPSettings.teamCheck end
+function ESP:ToggleMasterColor() ESPSettings.masterColor = not ESPSettings.masterColor end
 
 return ESP
