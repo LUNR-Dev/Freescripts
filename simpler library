@@ -1,0 +1,155 @@
+-- ESP Library
+-- Usage:
+-- local lib = loadstring(game:HttpGet("YOUR_URL_HERE"))()
+-- lib.boxESP = true
+-- lib.nameESP = true
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+-- Main library table
+local ESP = {}
+
+-- Setup getgenv variables
+getgenv().ESPSettings = getgenv().ESPSettings or {}
+ESPSettings.boxESP = ESPSettings.boxESP or false
+ESPSettings.nameESP = ESPSettings.nameESP or false
+
+-- Tables to store ESP drawings
+local BoxESPBoxes = {}
+local NameESPLabels = {}
+
+-- --- Helper Functions --- --
+
+-- Create Box ESP for a character
+local function CreateBox(character)
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local box = Drawing.new("Square")
+    box.Visible = false
+    box.Thickness = 2
+    box.Color = Color3.fromRGB(255, 0, 0)
+    box.Filled = false
+    box.Transparency = 1
+    BoxESPBoxes[character] = box
+end
+
+-- Remove Box ESP
+local function RemoveBox(character)
+    if BoxESPBoxes[character] then
+        BoxESPBoxes[character]:Remove()
+        BoxESPBoxes[character] = nil
+    end
+end
+
+-- Create Name ESP for a character
+local function CreateName(character)
+    if not character or not character:FindFirstChild("Head") then return end
+    local nameLabel = Drawing.new("Text")
+    nameLabel.Visible = false
+    nameLabel.Color = Color3.fromRGB(255, 255, 255)
+    nameLabel.Size = 16
+    nameLabel.Center = true
+    nameLabel.Outline = true
+    nameLabel.Text = character.Name
+    NameESPLabels[character] = nameLabel
+end
+
+-- Remove Name ESP
+local function RemoveName(character)
+    if NameESPLabels[character] then
+        NameESPLabels[character]:Remove()
+        NameESPLabels[character] = nil
+    end
+end
+
+-- Handle character added
+local function OnCharacterAdded(character)
+    CreateBox(character)
+    CreateName(character)
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid.Died:Connect(function()
+            RemoveBox(character)
+            RemoveName(character)
+        end)
+    end
+end
+
+-- Handle player added
+local function OnPlayerAdded(player)
+    player.CharacterAdded:Connect(OnCharacterAdded)
+    if player.Character then
+        OnCharacterAdded(player.Character)
+    end
+end
+
+-- Handle player leaving
+local function OnPlayerRemoving(player)
+    if player.Character then
+        RemoveBox(player.Character)
+        RemoveName(player.Character)
+    end
+end
+
+-- Connect events for all players
+for _, player in pairs(Players:GetPlayers()) do
+    OnPlayerAdded(player)
+end
+Players.PlayerAdded:Connect(OnPlayerAdded)
+Players.PlayerRemoving:Connect(OnPlayerRemoving)
+
+-- --- Render Loop --- --
+RunService.RenderStepped:Connect(function()
+    for character, box in pairs(BoxESPBoxes) do
+        if ESPSettings.boxESP and character and character:FindFirstChild("HumanoidRootPart") then
+            local hrp = character.HumanoidRootPart
+            local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(hrp.Position)
+            if onScreen then
+                box.Visible = true
+                box.Position = Vector2.new(pos.X - 25, pos.Y - 50)
+                box.Size = Vector2.new(50, 100)
+            else
+                box.Visible = false
+            end
+        else
+            if box then box.Visible = false end
+        end
+    end
+
+    for character, label in pairs(NameESPLabels) do
+        if ESPSettings.nameESP and character and character:FindFirstChild("Head") then
+            local head = character.Head
+            local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
+            if onScreen then
+                label.Visible = true
+                label.Position = Vector2.new(pos.X, pos.Y)
+            else
+                label.Visible = false
+            end
+        else
+            if label then label.Visible = false end
+        end
+    end
+end)
+
+-- --- Library Functions --- --
+
+function ESP:SetBoxESP(bool)
+    ESPSettings.boxESP = bool
+end
+
+function ESP:SetNameESP(bool)
+    ESPSettings.nameESP = bool
+end
+
+function ESP:ToggleBoxESP()
+    ESPSettings.boxESP = not ESPSettings.boxESP
+end
+
+function ESP:ToggleNameESP()
+    ESPSettings.nameESP = not ESPSettings.nameESP
+end
+
+return ESP
