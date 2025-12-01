@@ -1,8 +1,9 @@
--- ESP Library with FOV-Based Scaling
+-- ESP Library with Team Check
 -- Usage:
 -- local lib = loadstring(game:HttpGet("YOUR_URL_HERE"))()
 -- lib.boxESP = true
 -- lib.nameESP = true
+-- lib.teamCheck = true
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -15,6 +16,7 @@ local ESP = {}
 getgenv().ESPSettings = getgenv().ESPSettings or {}
 ESPSettings.boxESP = ESPSettings.boxESP or false
 ESPSettings.nameESP = ESPSettings.nameESP or false
+ESPSettings.teamCheck = ESPSettings.teamCheck or false  -- team check toggle
 
 -- Tables to store ESP drawings
 local BoxESPBoxes = {}
@@ -63,6 +65,15 @@ local function RemoveName(character)
     end
 end
 
+-- Check if a player is an enemy (team check)
+local function IsEnemy(player)
+    if not ESPSettings.teamCheck then return true end
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer then return true end
+    if not player.Team or not localPlayer.Team then return true end
+    return player.Team ~= localPlayer.Team
+end
+
 -- Handle character added
 local function OnCharacterAdded(character)
     CreateBox(character)
@@ -100,17 +111,18 @@ end
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
--- --- Render Loop with FOV-Based Scaling --- --
+-- --- Render Loop with Team Check --- --
 RunService.RenderStepped:Connect(function()
     local camera = Workspace.CurrentCamera
 
     for character, box in pairs(BoxESPBoxes) do
-        if ESPSettings.boxESP and character and character:FindFirstChild("HumanoidRootPart") then
+        local player = Players:GetPlayerFromCharacter(character)
+        if player and ESPSettings.boxESP and IsEnemy(player) and character:FindFirstChild("HumanoidRootPart") then
             local hrp = character.HumanoidRootPart
             local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
             
             if onScreen then
-                -- Use the FOV scaling formula
+                -- FOV-based scaling
                 local scale = 1 / (pos.Z * math.tan(math.rad(camera.FieldOfView * 0.5)) * 2) * 1000
                 local width, height = math.floor(4.5 * scale), math.floor(6 * scale)
                 local x, y = math.floor(pos.X), math.floor(pos.Y)
@@ -129,7 +141,8 @@ RunService.RenderStepped:Connect(function()
 
     -- Name ESP
     for character, label in pairs(NameESPLabels) do
-        if ESPSettings.nameESP and character and character:FindFirstChild("Head") then
+        local player = Players:GetPlayerFromCharacter(character)
+        if player and ESPSettings.nameESP and IsEnemy(player) and character:FindFirstChild("Head") then
             local head = character.Head
             local pos, onScreen = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
             if onScreen then
@@ -154,12 +167,20 @@ function ESP:SetNameESP(bool)
     ESPSettings.nameESP = bool
 end
 
+function ESP:SetTeamCheck(bool)
+    ESPSettings.teamCheck = bool
+end
+
 function ESP:ToggleBoxESP()
     ESPSettings.boxESP = not ESPSettings.boxESP
 end
 
 function ESP:ToggleNameESP()
     ESPSettings.nameESP = not ESPSettings.nameESP
+end
+
+function ESP:ToggleTeamCheck()
+    ESPSettings.teamCheck = not ESPSettings.teamCheck
 end
 
 return ESP
