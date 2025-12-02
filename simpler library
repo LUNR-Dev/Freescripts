@@ -1,4 +1,4 @@
--- ESP Library with Color Customization + 3D Box ESP
+-- ESP Library with Color Customization + 3D Box ESP (Player-Sized)
 -- Usage:
 -- lib.boxESP = true
 -- lib.box3dESP = true
@@ -57,24 +57,8 @@ end
 local function Update3DBox(character, hrp, camera)
     if not Box3DLines[character] then return end
 
-    local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
-    if not onScreen then
-        for _, l in ipairs(Box3DLines[character]) do
-            l.Visible = false
-        end
-        return
-    end
-
-    -- MATCH 2D BOX SCALING EXACTLY
-    local scale = 1 / pos.Z * 120
-    local width = 35 * scale
-    local height = 50 * scale
-
-    -- Convert 2D box to 3D depth
-    local depth = width * 0.4  -- proportional depth
-
-    -- Build 3D offsets
-    local size = Vector3.new(width / 2, height / 2, depth)
+    -- NEW SMALLER SIZE TO FIT PLAYER
+    local size = Vector3.new(2, 3, 1.5)
 
     local cf = hrp.CFrame
 
@@ -118,8 +102,6 @@ local function Update3DBox(character, hrp, camera)
         line.To = screen[e[2]]
     end
 end
-
-
 
 ------------------------------------------
 -- 2D BOX + NAME FUNCTIONS
@@ -266,8 +248,8 @@ RunService.RenderStepped:Connect(function()
                 Update3DBox(character, hrp, camera)
             end
         else
-            if Box3DLines[character] then
-                for _, l in ipairs(Box3DLines[character]) do l.Visible = false end
+            for _, l in ipairs(Box3DLines[character] or {}) do
+                l.Visible = false
             end
         end
     end
