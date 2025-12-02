@@ -57,14 +57,33 @@ end
 local function Update3DBox(character, hrp, camera)
     if not Box3DLines[character] then return end
 
+    local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+    if not onScreen then
+        for _, l in ipairs(Box3DLines[character]) do
+            l.Visible = false
+        end
+        return
+    end
+
+    -- MATCH 2D BOX SCALING EXACTLY
+    local scale = 1 / pos.Z * 120
+    local width = 35 * scale
+    local height = 50 * scale
+
+    -- Convert 2D box to 3D depth
+    local depth = width * 0.4  -- proportional depth
+
+    -- Build 3D offsets
+    local size = Vector3.new(width / 2, height / 2, depth)
+
     local cf = hrp.CFrame
-    local size = Vector3.new(4, 6, 2)
 
     local corners = {
         cf * Vector3.new(-size.X, -size.Y, -size.Z),
         cf * Vector3.new(size.X, -size.Y, -size.Z),
         cf * Vector3.new(size.X, size.Y, -size.Z),
         cf * Vector3.new(-size.X, size.Y, -size.Z),
+
         cf * Vector3.new(-size.X, -size.Y, size.Z),
         cf * Vector3.new(size.X, -size.Y, size.Z),
         cf * Vector3.new(size.X, size.Y, size.Z),
@@ -83,8 +102,6 @@ local function Update3DBox(character, hrp, camera)
         screen[i] = Vector2.new(p.X, p.Y)
     end
 
-    local lines = Box3DLines[character]
-
     local edges = {
         {1,2},{2,3},{3,4},{4,1},
         {5,6},{6,7},{7,8},{8,5},
@@ -94,13 +111,14 @@ local function Update3DBox(character, hrp, camera)
     local color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor
 
     for i, e in ipairs(edges) do
-        local line = lines[i]
+        local line = Box3DLines[character][i]
         line.Visible = ESPSettings.box3dESP
         line.Color = color
         line.From = screen[e[1]]
         line.To = screen[e[2]]
     end
 end
+
 
 
 ------------------------------------------
