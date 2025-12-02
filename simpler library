@@ -1,13 +1,10 @@
--- ESP Library with Color Customization
+-- ESP Library with Color Customization + 3D Box ESP
 -- Usage:
--- local lib = loadstring(game:HttpGet("YOUR_URL_HERE"))()
 -- lib.boxESP = true
+-- lib.box3dESP = true
 -- lib.nameESP = true
 -- lib.teamCheck = true
 -- lib.masterColor = true
--- lib.boxColor = Color3.fromRGB(255,0,0)
--- lib.nameColor = Color3.fromRGB(255,255,255)
--- lib.mainColor = Color3.fromRGB(0,255,0)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -15,9 +12,10 @@ local Workspace = game:GetService("Workspace")
 
 local ESP = {}
 
--- getgenv settings
+-- SETTINGS
 getgenv().ESPSettings = getgenv().ESPSettings or {}
 ESPSettings.boxESP = ESPSettings.boxESP or false
+ESPSettings.box3dESP = ESPSettings.box3dESP or false
 ESPSettings.nameESP = ESPSettings.nameESP or false
 ESPSettings.teamCheck = ESPSettings.teamCheck or false
 ESPSettings.masterColor = ESPSettings.masterColor or false
@@ -25,11 +23,90 @@ ESPSettings.boxColor = ESPSettings.boxColor or Color3.fromRGB(255,0,0)
 ESPSettings.nameColor = ESPSettings.nameColor or Color3.fromRGB(255,255,255)
 ESPSettings.mainColor = ESPSettings.mainColor or Color3.fromRGB(0,255,0)
 
--- Tables for ESP drawings
+-- DRAWING TABLES
 local BoxESPBoxes = {}
 local NameESPLabels = {}
+local Box3DLines = {} -- 12 lines per character
 
--- --- Helper Functions ---
+------------------------------------------
+-- 3D BOX FUNCTIONS
+------------------------------------------
+
+local function Create3DBox(character)
+    if Box3DLines[character] then return end
+    Box3DLines[character] = {}
+
+    for i = 1, 12 do
+        local line = Drawing.new("Line")
+        line.Visible = false
+        line.Thickness = 2
+        line.Color = ESPSettings.boxColor
+        Box3DLines[character][i] = line
+    end
+end
+
+local function Remove3DBox(character)
+    if Box3DLines[character] then
+        for _, l in ipairs(Box3DLines[character]) do
+            l:Remove()
+        end
+        Box3DLines[character] = nil
+    end
+end
+
+local function Update3DBox(character, hrp, camera)
+    if not Box3DLines[character] then return end
+
+    local cf = hrp.CFrame
+    local size = Vector3.new(4, 6, 2)
+
+    local corners = {
+        cf * Vector3.new(-size.X, -size.Y, -size.Z),
+        cf * Vector3.new(size.X, -size.Y, -size.Z),
+        cf * Vector3.new(size.X, size.Y, -size.Z),
+        cf * Vector3.new(-size.X, size.Y, -size.Z),
+        cf * Vector3.new(-size.X, -size.Y, size.Z),
+        cf * Vector3.new(size.X, -size.Y, size.Z),
+        cf * Vector3.new(size.X, size.Y, size.Z),
+        cf * Vector3.new(-size.X, size.Y, size.Z),
+    }
+
+    local screen = {}
+    for i = 1, 8 do
+        local p, vis = camera:WorldToViewportPoint(corners[i])
+        if not vis then
+            for _, l in ipairs(Box3DLines[character]) do
+                l.Visible = false
+            end
+            return
+        end
+        screen[i] = Vector2.new(p.X, p.Y)
+    end
+
+    local lines = Box3DLines[character]
+
+    local edges = {
+        {1,2},{2,3},{3,4},{4,1},
+        {5,6},{6,7},{7,8},{8,5},
+        {1,5},{2,6},{3,7},{4,8},
+    }
+
+    local color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor
+
+    for i, e in ipairs(edges) do
+        local line = lines[i]
+        line.Visible = ESPSettings.box3dESP
+        line.Color = color
+        line.From = screen[e[1]]
+        line.To = screen[e[2]]
+    end
+end
+
+
+------------------------------------------
+-- 2D BOX + NAME FUNCTIONS
+------------------------------------------
+
 local function CreateBox(character)
     if not character or not character:FindFirstChild("HumanoidRootPart") then return end
     local box = Drawing.new("Square")
@@ -70,102 +147,129 @@ end
 local function IsEnemy(player)
     if not ESPSettings.teamCheck then return true end
     local localPlayer = Players.LocalPlayer
-    if not localPlayer then return true end
-    if not player.Team or not localPlayer.Team then return true end
     return player.Team ~= localPlayer.Team
 end
 
--- --- Player Events ---
+------------------------------------------
+-- PLAYER EVENTS
+------------------------------------------
+
 local function OnCharacterAdded(character)
     CreateBox(character)
     CreateName(character)
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    if humanoid then
-        humanoid.Died:Connect(function()
+    Create3DBox(character)
+
+    local hum = character:FindFirstChild("Humanoid")
+    if hum then
+        hum.Died:Connect(function()
             RemoveBox(character)
             RemoveName(character)
+            Remove3DBox(character)
         end)
     end
 end
 
 local function OnPlayerAdded(player)
     player.CharacterAdded:Connect(OnCharacterAdded)
-    if player.Character then
-        OnCharacterAdded(player.Character)
-    end
+    if player.Character then OnCharacterAdded(player.Character) end
 end
 
 local function OnPlayerRemoving(player)
     if player.Character then
         RemoveBox(player.Character)
         RemoveName(player.Character)
+        Remove3DBox(player.Character)
     end
 end
 
-for _, player in pairs(Players:GetPlayers()) do
-    OnPlayerAdded(player)
+for _, p in ipairs(Players:GetPlayers()) do
+    OnPlayerAdded(p)
 end
+
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
--- --- Render Loop ---
+------------------------------------------
+-- RENDER LOOP
+------------------------------------------
+
 RunService.RenderStepped:Connect(function()
     local camera = Workspace.CurrentCamera
+
+    -- 2D BOX
     for character, box in pairs(BoxESPBoxes) do
         local player = Players:GetPlayerFromCharacter(character)
-        if player and ESPSettings.boxESP and IsEnemy(player) and character:FindFirstChild("HumanoidRootPart") then
-            local hrp = character.HumanoidRootPart
-            local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
-            if onScreen then
-                -- FOV-based scaling
-                local scale = 1 / (pos.Z * math.tan(math.rad(camera.FieldOfView * 0.5)) * 2) * 1000
-                local width, height = math.floor(4.5 * scale), math.floor(6 * scale)
-                local x, y = math.floor(pos.X), math.floor(pos.Y)
-                local xPosition, yPosition = math.floor(x - width * 0.5), math.floor((y - height * 0.5) + (0.5 * scale))
-
-                box.Visible = true
-                box.Position = Vector2.new(xPosition, yPosition)
-                box.Size = Vector2.new(width, height)
-
-                -- Color
-                box.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor
-            else
-                box.Visible = false
+        if player and ESPSettings.boxESP and IsEnemy(player) then
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local scale = 1 / pos.Z * 120
+                    local width, height = 35 * scale, 50 * scale
+                    box.Visible = true
+                    box.Position = Vector2.new(pos.X - width/2, pos.Y - height/2)
+                    box.Size = Vector2.new(width, height)
+                    box.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor
+                else
+                    box.Visible = false
+                end
             end
         else
-            if box then box.Visible = false end
+            box.Visible = false
         end
     end
 
+    -- NAME ESP
     for character, label in pairs(NameESPLabels) do
         local player = Players:GetPlayerFromCharacter(character)
-        if player and ESPSettings.nameESP and IsEnemy(player) and character:FindFirstChild("Head") then
-            local head = character.Head
-            local pos, onScreen = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
-            if onScreen then
-                label.Visible = true
-                label.Position = Vector2.new(pos.X, pos.Y)
-                label.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.nameColor
-            else
-                label.Visible = false
+        if player and ESPSettings.nameESP and IsEnemy(player) then
+            local head = character:FindFirstChild("Head")
+            if head then
+                local pos, onScreen = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 2, 0))
+                if onScreen then
+                    label.Visible = true
+                    label.Position = Vector2.new(pos.X, pos.Y)
+                    label.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.nameColor
+                else
+                    label.Visible = false
+                end
             end
         else
-            if label then label.Visible = false end
+            label.Visible = false
+        end
+    end
+
+    -- 3D BOX
+    for character, _ in pairs(Box3DLines) do
+        local player = Players:GetPlayerFromCharacter(character)
+        if player and ESPSettings.box3dESP and IsEnemy(player) then
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                Update3DBox(character, hrp, camera)
+            end
+        else
+            if Box3DLines[character] then
+                for _, l in ipairs(Box3DLines[character]) do l.Visible = false end
+            end
         end
     end
 end)
 
--- --- Library Functions ---
-function ESP:SetBoxESP(bool) ESPSettings.boxESP = bool end
-function ESP:SetNameESP(bool) ESPSettings.nameESP = bool end
-function ESP:SetTeamCheck(bool) ESPSettings.teamCheck = bool end
-function ESP:SetMasterColor(bool) ESPSettings.masterColor = bool end
-function ESP:SetBoxColor(color) ESPSettings.boxColor = color end
-function ESP:SetNameColor(color) ESPSettings.nameColor = color end
-function ESP:SetMainColor(color) ESPSettings.mainColor = color end
+------------------------------------------
+-- PUBLIC FUNCTIONS
+------------------------------------------
+
+function ESP:SetBoxESP(b) ESPSettings.boxESP = b end
+function ESP:Set3DBoxESP(b) ESPSettings.box3dESP = b end
+function ESP:SetNameESP(b) ESPSettings.nameESP = b end
+function ESP:SetTeamCheck(b) ESPSettings.teamCheck = b end
+function ESP:SetMasterColor(b) ESPSettings.masterColor = b end
+function ESP:SetBoxColor(c) ESPSettings.boxColor = c end
+function ESP:SetNameColor(c) ESPSettings.nameColor = c end
+function ESP:SetMainColor(c) ESPSettings.mainColor = c end
 
 function ESP:ToggleBoxESP() ESPSettings.boxESP = not ESPSettings.boxESP end
+function ESP:Toggle3DBoxESP() ESPSettings.box3dESP = not ESPSettings.box3dESP end
 function ESP:ToggleNameESP() ESPSettings.nameESP = not ESPSettings.nameESP end
 function ESP:ToggleTeamCheck() ESPSettings.teamCheck = not ESPSettings.teamCheck end
 function ESP:ToggleMasterColor() ESPSettings.masterColor = not ESPSettings.masterColor end
