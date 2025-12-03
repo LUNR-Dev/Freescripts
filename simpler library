@@ -1,10 +1,4 @@
-Got it — here’s the **full corrected ESP library code** with the safety wrapper included all the way through. This version ensures that no `nil` values ever get assigned to a `Color3` property, which prevents the `BackgroundColor3` error you saw.  
 
----
-
-### ✅ Full ESP Library (SafeColor Fix Applied)
-
-```lua
 -- ESP Library with Color Customization + 3D Box ESP + Glow ESP + Tracers
 
 local Players = game:GetService("Players")
