@@ -1,8 +1,9 @@
--- ESP Library with Color Customization + 3D Box ESP (Player-Sized)
+-- ESP Library with Color Customization + 3D Box ESP + Glow ESP (Player-Sized)
 -- Usage:
 -- lib.boxESP = true
 -- lib.box3dESP = true
 -- lib.nameESP = true
+-- lib.glowESP = true
 -- lib.teamCheck = true
 -- lib.masterColor = true
 
@@ -17,16 +18,19 @@ getgenv().ESPSettings = getgenv().ESPSettings or {}
 ESPSettings.boxESP = ESPSettings.boxESP or false
 ESPSettings.box3dESP = ESPSettings.box3dESP or false
 ESPSettings.nameESP = ESPSettings.nameESP or false
+ESPSettings.glowESP = ESPSettings.glowESP or false
 ESPSettings.teamCheck = ESPSettings.teamCheck or false
 ESPSettings.masterColor = ESPSettings.masterColor or false
 ESPSettings.boxColor = ESPSettings.boxColor or Color3.fromRGB(255,0,0)
 ESPSettings.nameColor = ESPSettings.nameColor or Color3.fromRGB(255,255,255)
 ESPSettings.mainColor = ESPSettings.mainColor or Color3.fromRGB(0,255,0)
+ESPSettings.glowColor = ESPSettings.glowColor or Color3.fromRGB(0,255,255)
 
 -- DRAWING TABLES
 local BoxESPBoxes = {}
 local NameESPLabels = {}
 local Box3DLines = {} -- 12 lines per character
+local GlowESP = {}
 
 ------------------------------------------
 -- 3D BOX FUNCTIONS
@@ -59,7 +63,6 @@ local function Update3DBox(character, hrp, camera)
 
     -- NEW SMALLER SIZE TO FIT PLAYER
     local size = Vector3.new(2, 3, 1.5)
-
     local cf = hrp.CFrame
 
     local corners = {
@@ -144,6 +147,50 @@ local function RemoveName(character)
     end
 end
 
+------------------------------------------
+-- GLOW FUNCTIONS
+------------------------------------------
+
+local function CreateGlow(character)
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local glow = Drawing.new("Circle")
+    glow.Visible = false
+    glow.Thickness = 4
+    glow.NumSides = 30
+    glow.Radius = 60
+    glow.Color = ESPSettings.glowColor
+    glow.Filled = false
+    glow.Transparency = 0.8
+    GlowESP[character] = glow
+end
+
+local function RemoveGlow(character)
+    if GlowESP[character] then
+        GlowESP[character]:Remove()
+        GlowESP[character] = nil
+    end
+end
+
+local function UpdateGlow(character, hrp, camera)
+    if not GlowESP[character] then return end
+    local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+    if onScreen then
+        local glow = GlowESP[character]
+        glow.Visible = ESPSettings.glowESP
+        glow.Position = Vector2.new(pos.X, pos.Y)
+        glow.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.glowColor
+        -- Optional dynamic scale by distance (uncomment to enable):
+        -- local scale = 1 / math.max(pos.Z, 0.1) * 120
+        -- glow.Radius = 45 * (scale / 3)
+    else
+        GlowESP[character].Visible = false
+    end
+end
+
+------------------------------------------
+-- TEAM CHECK
+------------------------------------------
+
 local function IsEnemy(player)
     if not ESPSettings.teamCheck then return true end
     local localPlayer = Players.LocalPlayer
@@ -158,6 +205,7 @@ local function OnCharacterAdded(character)
     CreateBox(character)
     CreateName(character)
     Create3DBox(character)
+    CreateGlow(character)
 
     local hum = character:FindFirstChild("Humanoid")
     if hum then
@@ -165,6 +213,7 @@ local function OnCharacterAdded(character)
             RemoveBox(character)
             RemoveName(character)
             Remove3DBox(character)
+            RemoveGlow(character)
         end)
     end
 end
@@ -179,6 +228,7 @@ local function OnPlayerRemoving(player)
         RemoveBox(player.Character)
         RemoveName(player.Character)
         Remove3DBox(player.Character)
+        RemoveGlow(player.Character)
     end
 end
 
@@ -253,6 +303,21 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
+
+    -- GLOW ESP
+    for character, glow in pairs(GlowESP) do
+        local player = Players:GetPlayerFromCharacter(character)
+        if player and ESPSettings.glowESP and IsEnemy(player) then
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                UpdateGlow(character, hrp, camera)
+            else
+                glow.Visible = false
+            end
+        else
+            glow.Visible = false
+        end
+    end
 end)
 
 ------------------------------------------
@@ -262,15 +327,18 @@ end)
 function ESP:SetBoxESP(b) ESPSettings.boxESP = b end
 function ESP:Set3DBoxESP(b) ESPSettings.box3dESP = b end
 function ESP:SetNameESP(b) ESPSettings.nameESP = b end
+function ESP:SetGlowESP(b) ESPSettings.glowESP = b end
 function ESP:SetTeamCheck(b) ESPSettings.teamCheck = b end
 function ESP:SetMasterColor(b) ESPSettings.masterColor = b end
 function ESP:SetBoxColor(c) ESPSettings.boxColor = c end
 function ESP:SetNameColor(c) ESPSettings.nameColor = c end
 function ESP:SetMainColor(c) ESPSettings.mainColor = c end
+function ESP:SetGlowColor(c) ESPSettings.glowColor = c end
 
 function ESP:ToggleBoxESP() ESPSettings.boxESP = not ESPSettings.boxESP end
 function ESP:Toggle3DBoxESP() ESPSettings.box3dESP = not ESPSettings.box3dESP end
 function ESP:ToggleNameESP() ESPSettings.nameESP = not ESPSettings.nameESP end
+function ESP:ToggleGlowESP() ESPSettings.glowESP = not ESPSettings.glowESP end
 function ESP:ToggleTeamCheck() ESPSettings.teamCheck = not ESPSettings.teamCheck end
 function ESP:ToggleMasterColor() ESPSettings.masterColor = not ESPSettings.masterColor end
 
