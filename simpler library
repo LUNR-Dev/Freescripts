@@ -212,7 +212,7 @@ local function UpdateTracer(character, hrp, camera)
     if onScreen then
         local line = Tracers[character]
         line.Visible = ESPSettings.tracerESP
-        line.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.tracerColor
+        line.Color =  ESPSettings.tracerColor or ESPSettings.mainColor
         local screenSize = camera.ViewportSize
         line.From = Vector2.new(screenSize.X / 2, screenSize.Y)
         line.To = Vector2.new(pos.X, pos.Y)
