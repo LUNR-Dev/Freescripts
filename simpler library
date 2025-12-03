@@ -1,4 +1,4 @@
--- FULL ESP LIBRARY (2D Box, 3D Box, Glow, Name, Team Check, Master Color)
+-- FULL ESP LIBRARY (2D Box, 3D Box, Glow, Name, Team Check, Master Color)2
 -- Everything is toggleable + color-syncable
 
 local Players = game:GetService("Players")
@@ -188,7 +188,8 @@ local function OnCharacterAdded(character)
     Create3DBox(character)
     CreateGlow(character)
 
-    local hum = character:FindFirstChild("Humanoid")
+    task.spawn(function()
+    local hum = character:WaitForChild("Humanoid", 5)
     if hum then
         hum.Died:Connect(function()
             RemoveBox(character)
@@ -197,6 +198,8 @@ local function OnCharacterAdded(character)
             RemoveGlow(character)
         end)
     end
+end)
+
 end
 
 local function OnPlayerAdded(player)
