@@ -1,8 +1,15 @@
--- FULL ESP LIBRARY (2D Box, 3D Box, Glow, Name, Team Check, Master Color)2
--- Everything is toggleable + color-syncable
+```lua
+-- ESP Library with Color Customization + 3D Box ESP + Glow ESP (Player-Sized)
+-- Usage:
+-- lib.boxESP = true
+-- lib.box3dESP = true
+-- lib.nameESP = true
+-- lib.glowESP = true
+-- lib.teamCheck = true
+-- lib.masterColor = true
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RenderStepped")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local ESP = {}
@@ -15,36 +22,20 @@ ESPSettings.nameESP = ESPSettings.nameESP or false
 ESPSettings.glowESP = ESPSettings.glowESP or false
 ESPSettings.teamCheck = ESPSettings.teamCheck or false
 ESPSettings.masterColor = ESPSettings.masterColor or false
-
 ESPSettings.boxColor = ESPSettings.boxColor or Color3.fromRGB(255,0,0)
 ESPSettings.nameColor = ESPSettings.nameColor or Color3.fromRGB(255,255,255)
 ESPSettings.mainColor = ESPSettings.mainColor or Color3.fromRGB(0,255,0)
-ESPSettings.glowColor = ESPSettings.glowColor or Color3.fromRGB(255,255,0)
+ESPSettings.glowColor = ESPSettings.glowColor or Color3.fromRGB(0,255,255)
 
-ESPSettings.glowSize = ESPSettings.glowSize or 5
-ESPSettings.glowRadius = ESPSettings.glowRadius or 6
-
-
--- DRAW TABLES
+-- DRAWING TABLES
 local BoxESPBoxes = {}
 local NameESPLabels = {}
-local Box3DLines = {}
-local GlowRings = {}
+local Box3DLines = {} -- 12 lines per character
+local GlowESP = {}
 
---------------------------------------------------------
--- Helper: Team Check
---------------------------------------------------------
-
-local function IsEnemy(player)
-    if not ESPSettings.teamCheck then return true end
-    local lp = Players.LocalPlayer
-    if not lp or not lp.Team or not player.Team then return true end
-    return player.Team ~= lp.Team
-end
-
---------------------------------------------------------
--- 3D BOX
---------------------------------------------------------
+------------------------------------------
+-- 3D BOX FUNCTIONS
+------------------------------------------
 
 local function Create3DBox(character)
     if Box3DLines[character] then return end
@@ -54,7 +45,8 @@ local function Create3DBox(character)
         local line = Drawing.new("Line")
         line.Visible = false
         line.Thickness = 2
-        table.insert(Box3DLines[character], line)
+        line.Color = ESPSettings.boxColor
+        Box3DLines[character][i] = line
     end
 end
 
@@ -68,10 +60,10 @@ local function Remove3DBox(character)
 end
 
 local function Update3DBox(character, hrp, camera)
-    local lines = Box3DLines[character]
-    if not lines then return end
+    if not Box3DLines[character] then return end
 
-    local size = Vector3.new(2, 3, 1.5) -- player-fitting size
+    -- NEW SMALLER SIZE TO FIT PLAYER
+    local size = Vector3.new(2, 3, 1.5)
     local cf = hrp.CFrame
 
     local corners = {
@@ -90,7 +82,9 @@ local function Update3DBox(character, hrp, camera)
     for i = 1, 8 do
         local p, vis = camera:WorldToViewportPoint(corners[i])
         if not vis then
-            for _, l in ipairs(lines) do l.Visible = false end
+            for _, l in ipairs(Box3DLines[character]) do
+                l.Visible = false
+            end
             return
         end
         screen[i] = Vector2.new(p.X, p.Y)
@@ -102,26 +96,29 @@ local function Update3DBox(character, hrp, camera)
         {1,5},{2,6},{3,7},{4,8},
     }
 
-    local col = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor
+    local color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor
 
     for i, e in ipairs(edges) do
-        local l = lines[i]
-        l.From = screen[e[1]]
-        l.To = screen[e[2]]
-        l.Color = col
-        l.Visible = ESPSettings.box3dESP
+        local line = Box3DLines[character][i]
+        line.Visible = ESPSettings.box3dESP
+        line.Color = color
+        line.From = screen[e[1]]
+        line.To = screen[e[2]]
     end
 end
 
---------------------------------------------------------
--- 2D BOX
---------------------------------------------------------
+------------------------------------------
+-- 2D BOX + NAME FUNCTIONS
+------------------------------------------
 
 local function CreateBox(character)
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
     local box = Drawing.new("Square")
     box.Visible = false
     box.Thickness = 2
+    box.Color = ESPSettings.boxColor
     box.Filled = false
+    box.Transparency = 1
     BoxESPBoxes[character] = box
 end
 
@@ -132,16 +129,14 @@ local function RemoveBox(character)
     end
 end
 
---------------------------------------------------------
--- NAME ESP
---------------------------------------------------------
-
 local function CreateName(character)
+    if not character or not character:FindFirstChild("Head") then return end
     local label = Drawing.new("Text")
     label.Visible = false
+    label.Color = ESPSettings.nameColor
+    label.Size = 16
     label.Center = true
     label.Outline = true
-    label.Size = 15
     label.Text = character.Name
     NameESPLabels[character] = label
 end
@@ -153,34 +148,59 @@ local function RemoveName(character)
     end
 end
 
---------------------------------------------------------
--- GLOW ESP
---------------------------------------------------------
+------------------------------------------
+-- GLOW FUNCTIONS
+------------------------------------------
 
 local function CreateGlow(character)
-    GlowRings[character] = {}
-
-    for i = 1, ESPSettings.glowSize do
-        local c = Drawing.new("Circle")
-        c.Visible = false
-        c.Filled = false
-        c.Thickness = 2
-        c.Radius = ESPSettings.glowRadius + i * 2
-        c.Transparency = 0.6 - (i * 0.08)
-        table.insert(GlowRings[character], c)
-    end
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local glow = Drawing.new("Circle")
+    glow.Visible = false
+    glow.Thickness = 4
+    glow.NumSides = 30
+    glow.Radius = 60
+    glow.Color = ESPSettings.glowColor
+    glow.Filled = false
+    glow.Transparency = 0.8
+    GlowESP[character] = glow
 end
 
 local function RemoveGlow(character)
-    if GlowRings[character] then
-        for _, c in ipairs(GlowRings[character]) do c:Remove() end
-        GlowRings[character] = nil
+    if GlowESP[character] then
+        GlowESP[character]:Remove()
+        GlowESP[character] = nil
     end
 end
 
---------------------------------------------------------
--- PLAYER EVENT HANDLING
---------------------------------------------------------
+local function UpdateGlow(character, hrp, camera)
+    if not GlowESP[character] then return end
+    local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+    if onScreen then
+        local glow = GlowESP[character]
+        glow.Visible = ESPSettings.glowESP
+        glow.Position = Vector2.new(pos.X, pos.Y)
+        glow.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.glowColor
+        -- Optional dynamic scale by distance (uncomment to enable):
+        -- local scale = 1 / math.max(pos.Z, 0.1) * 120
+        -- glow.Radius = 45 * (scale / 3)
+    else
+        GlowESP[character].Visible = false
+    end
+end
+
+------------------------------------------
+-- TEAM CHECK
+------------------------------------------
+
+local function IsEnemy(player)
+    if not ESPSettings.teamCheck then return true end
+    local localPlayer = Players.LocalPlayer
+    return player.Team ~= localPlayer.Team
+end
+
+------------------------------------------
+-- PLAYER EVENTS
+------------------------------------------
 
 local function OnCharacterAdded(character)
     CreateBox(character)
@@ -188,8 +208,7 @@ local function OnCharacterAdded(character)
     Create3DBox(character)
     CreateGlow(character)
 
-    task.spawn(function()
-    local hum = character:WaitForChild("Humanoid", 5)
+    local hum = character:FindFirstChild("Humanoid")
     if hum then
         hum.Died:Connect(function()
             RemoveBox(character)
@@ -198,8 +217,6 @@ local function OnCharacterAdded(character)
             RemoveGlow(character)
         end)
     end
-end)
-
 end
 
 local function OnPlayerAdded(player)
@@ -219,124 +236,105 @@ end
 for _, p in ipairs(Players:GetPlayers()) do
     OnPlayerAdded(p)
 end
+
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
---------------------------------------------------------
--- MAIN RENDER LOOP
---------------------------------------------------------
+------------------------------------------
+-- RENDER LOOP
+------------------------------------------
 
-RunService:Connect(function()
-    local cam = Workspace.CurrentCamera
+RunService.RenderStepped:Connect(function()
+    local camera = Workspace.CurrentCamera
 
-    --------------------------------
     -- 2D BOX
-    --------------------------------
     for character, box in pairs(BoxESPBoxes) do
         local player = Players:GetPlayerFromCharacter(character)
-        if not (player and character:FindFirstChild("HumanoidRootPart")) then continue end
-
-        local hrp = character.HumanoidRootPart
-
-        if ESPSettings.boxESP and IsEnemy(player) then
-            local pos, vis = cam:WorldToViewportPoint(hrp.Position)
-            if vis then
-                local scale = 1 / pos.Z * 120
-                local w, h = 35 * scale, 50 * scale
-                box.Visible = true
-                box.Position = Vector2.new(pos.X - w/2, pos.Y - h/2)
-                box.Size = Vector2.new(w, h)
-                box.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor
-            else
-                box.Visible = false
+        if player and ESPSettings.boxESP and IsEnemy(player) then
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local scale = 1 / pos.Z * 120
+                    local width, height = 35 * scale, 50 * scale
+                    box.Visible = true
+                    box.Position = Vector2.new(pos.X - width/2, pos.Y - height/2)
+                    box.Size = Vector2.new(width, height)
+                    box.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor
+                else
+                    box.Visible = false
+                end
             end
         else
             box.Visible = false
         end
     end
 
-    --------------------------------
     -- NAME ESP
-    --------------------------------
     for character, label in pairs(NameESPLabels) do
         local player = Players:GetPlayerFromCharacter(character)
-        if not (player and character:FindFirstChild("Head")) then continue end
-
-        local head = character.Head
-
-        if ESPSettings.nameESP and IsEnemy(player) then
-            local pos, vis = cam:WorldToViewportPoint(head.Position + Vector3.new(0,2,0))
-            if vis then
-                label.Visible = true
-                label.Position = Vector2.new(pos.X, pos.Y)
-                label.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.nameColor
-            else
-                label.Visible = false
+        if player and ESPSettings.nameESP and IsEnemy(player) then
+            local head = character:FindFirstChild("Head")
+            if head then
+                local pos, onScreen = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 2, 0))
+                if onScreen then
+                    label.Visible = true
+                    label.Position = Vector2.new(pos.X, pos.Y)
+                    label.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.nameColor
+                else
+                    label.Visible = false
+                end
             end
         else
             label.Visible = false
         end
     end
 
-    --------------------------------
     -- 3D BOX
-    --------------------------------
     for character, _ in pairs(Box3DLines) do
         local player = Players:GetPlayerFromCharacter(character)
         if player and ESPSettings.box3dESP and IsEnemy(player) then
             local hrp = character:FindFirstChild("HumanoidRootPart")
             if hrp then
-                Update3DBox(character, hrp, cam)
+                Update3DBox(character, hrp, camera)
             end
         else
-            for _, l in ipairs(Box3DLines[character] or {}) do l.Visible = false end
+            for _, l in ipairs(Box3DLines[character] or {}) do
+                l.Visible = false
+            end
         end
     end
 
-    --------------------------------
     -- GLOW ESP
-    --------------------------------
-    for character, rings in pairs(GlowRings) do
+    for character, glow in pairs(GlowESP) do
         local player = Players:GetPlayerFromCharacter(character)
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-
-        if player and ESPSettings.glowESP and hrp and IsEnemy(player) then
-            local pos, vis = cam:WorldToViewportPoint(hrp.Position)
-            local col = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.glowColor
-
-            if vis then
-                for _, r in ipairs(rings) do
-                    r.Visible = true
-                    r.Position = Vector2.new(pos.X, pos.Y)
-                    r.Color = col
-                end
+        if player and ESPSettings.glowESP and IsEnemy(player) then
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                UpdateGlow(character, hrp, camera)
             else
-                for _, r in ipairs(rings) do r.Visible = false end
+                glow.Visible = false
             end
         else
-            for _, r in ipairs(rings) do r.Visible = false end
+            glow.Visible = false
         end
     end
 end)
 
---------------------------------------------------------
--- PUBLIC API
---------------------------------------------------------
+------------------------------------------
+-- PUBLIC FUNCTIONS
+------------------------------------------
 
-function ESP:SetBoxESP(v) ESPSettings.boxESP = v end
-function ESP:Set3DBoxESP(v) ESPSettings.box3dESP = v end
-function ESP:SetNameESP(v) ESPSettings.nameESP = v end
-function ESP:SetGlowESP(v) ESPSettings.glowESP = v end
-function ESP:SetTeamCheck(v) ESPSettings.teamCheck = v end
-function ESP:SetMasterColor(v) ESPSettings.masterColor = v end
-
+function ESP:SetBoxESP(b) ESPSettings.boxESP = b end
+function ESP:Set3DBoxESP(b) ESPSettings.box3dESP = b end
+function ESP:SetNameESP(b) ESPSettings.nameESP = b end
+function ESP:SetGlowESP(b) ESPSettings.glowESP = b end
+function ESP:SetTeamCheck(b) ESPSettings.teamCheck = b end
+function ESP:SetMasterColor(b) ESPSettings.masterColor = b end
 function ESP:SetBoxColor(c) ESPSettings.boxColor = c end
 function ESP:SetNameColor(c) ESPSettings.nameColor = c end
-function ESP:SetGlowColor(c) ESPSettings.glowColor = c end
 function ESP:SetMainColor(c) ESPSettings.mainColor = c end
-
-function ESP:SetGlowSize(n) ESPSettings.glowSize = n end
-function ESP:SetGlowRadius(n) ESPSettings.glowRadius = n end
+function ESP:SetGlowColor(c) ESPSettings.glowColor = c end
 
 function ESP:ToggleBoxESP() ESPSettings.boxESP = not ESPSettings.boxESP end
 function ESP:Toggle3DBoxESP() ESPSettings.box3dESP = not ESPSettings.box3dESP end
@@ -346,3 +344,4 @@ function ESP:ToggleTeamCheck() ESPSettings.teamCheck = not ESPSettings.teamCheck
 function ESP:ToggleMasterColor() ESPSettings.masterColor = not ESPSettings.masterColor end
 
 return ESP
+```
