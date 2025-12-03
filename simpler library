@@ -14,8 +14,19 @@ local Workspace = game:GetService("Workspace")
 
 local ESP = {}
 
+-- Ensure Drawing API exists
+local hasDrawing = (Drawing and typeof(Drawing.new) == "function")
+if not hasDrawing then
+    warn("ESP disabled: Drawing API not available in this environment.")
+end
+
+
 -- SETTINGS
-getgenv().ESPSettings = getgenv().ESPSettings or {}
+-- SETTINGS (safe env fallback)
+local ENV = (typeof(getgenv) == "function" and getgenv()) or _G
+ENV.ESPSettings = ENV.ESPSettings or {}
+
+local ESPSettings = ENV.ESPSettings
 ESPSettings.boxESP = ESPSettings.boxESP or false
 ESPSettings.box3dESP = ESPSettings.box3dESP or false
 ESPSettings.nameESP = ESPSettings.nameESP or false
@@ -26,6 +37,7 @@ ESPSettings.boxColor = ESPSettings.boxColor or Color3.fromRGB(255,0,0)
 ESPSettings.nameColor = ESPSettings.nameColor or Color3.fromRGB(255,255,255)
 ESPSettings.mainColor = ESPSettings.mainColor or Color3.fromRGB(0,255,0)
 ESPSettings.glowColor = ESPSettings.glowColor or Color3.fromRGB(0,255,255)
+
 
 -- DRAWING TABLES
 local BoxESPBoxes = {}
