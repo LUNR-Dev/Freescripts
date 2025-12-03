@@ -1,4 +1,3 @@
-```lua
 -- ESP Library with Color Customization + 3D Box ESP (Player-Sized)
 -- Usage:
 -- lib.boxESP = true
@@ -276,4 +275,3 @@ function ESP:ToggleTeamCheck() ESPSettings.teamCheck = not ESPSettings.teamCheck
 function ESP:ToggleMasterColor() ESPSettings.masterColor = not ESPSettings.masterColor end
 
 return ESP
-```
