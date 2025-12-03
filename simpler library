@@ -1,12 +1,11 @@
+Got it — here’s the **full corrected ESP library code** with the safety wrapper included all the way through. This version ensures that no `nil` values ever get assigned to a `Color3` property, which prevents the `BackgroundColor3` error you saw.  
+
+---
+
+### ✅ Full ESP Library (SafeColor Fix Applied)
+
+```lua
 -- ESP Library with Color Customization + 3D Box ESP + Glow ESP + Tracers
--- Usage:
--- lib.boxESP = true
--- lib.box3dESP = true
--- lib.nameESP = true
--- lib.glowESP = true
--- lib.tracerESP = true
--- lib.teamCheck = true
--- lib.masterColor = true
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -29,45 +28,40 @@ ESPSettings.mainColor = ESPSettings.mainColor or Color3.fromRGB(0,255,0)
 ESPSettings.glowColor = ESPSettings.glowColor or Color3.fromRGB(0,255,255)
 ESPSettings.tracerColor = ESPSettings.tracerColor or Color3.fromRGB(255,255,0)
 
+-- SAFETY WRAPPER
+local function SafeColor(c)
+    return typeof(c) == "Color3" and c or Color3.fromRGB(255,255,255)
+end
+
 -- DRAWING TABLES
-local BoxESPBoxes = {}
-local NameESPLabels = {}
-local Box3DLines = {} -- 12 lines per character
-local GlowESP = {}
-local Tracers = {}
+local BoxESPBoxes, NameESPLabels, Box3DLines, GlowESP, Tracers = {}, {}, {}, {}, {}
 
 ------------------------------------------
 -- 3D BOX FUNCTIONS
 ------------------------------------------
-
 local function Create3DBox(character)
     if Box3DLines[character] then return end
     Box3DLines[character] = {}
-
     for i = 1, 12 do
         local line = Drawing.new("Line")
         line.Visible = false
         line.Thickness = 2
-        line.Color = ESPSettings.boxColor
+        line.Color = SafeColor(ESPSettings.boxColor)
         Box3DLines[character][i] = line
     end
 end
 
 local function Remove3DBox(character)
     if Box3DLines[character] then
-        for _, l in ipairs(Box3DLines[character]) do
-            l:Remove()
-        end
+        for _, l in ipairs(Box3DLines[character]) do l:Remove() end
         Box3DLines[character] = nil
     end
 end
 
 local function Update3DBox(character, hrp, camera)
     if not Box3DLines[character] then return end
-
     local size = Vector3.new(2, 3, 1.5)
     local cf = hrp.CFrame
-
     local corners = {
         cf * Vector3.new(-size.X, -size.Y, -size.Z),
         cf * Vector3.new(size.X, -size.Y, -size.Z),
@@ -78,27 +72,21 @@ local function Update3DBox(character, hrp, camera)
         cf * Vector3.new(size.X, size.Y, size.Z),
         cf * Vector3.new(-size.X, size.Y, size.Z),
     }
-
     local screen = {}
     for i = 1, 8 do
         local p, vis = camera:WorldToViewportPoint(corners[i])
         if not vis then
-            for _, l in ipairs(Box3DLines[character]) do
-                l.Visible = false
-            end
+            for _, l in ipairs(Box3DLines[character]) do l.Visible = false end
             return
         end
         screen[i] = Vector2.new(p.X, p.Y)
     end
-
     local edges = {
         {1,2},{2,3},{3,4},{4,1},
         {5,6},{6,7},{7,8},{8,5},
         {1,5},{2,6},{3,7},{4,8},
     }
-
-    local color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor
-
+    local color = SafeColor(ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor)
     for i, e in ipairs(edges) do
         local line = Box3DLines[character][i]
         line.Visible = ESPSettings.box3dESP
@@ -111,30 +99,26 @@ end
 ------------------------------------------
 -- 2D BOX + NAME FUNCTIONS
 ------------------------------------------
-
 local function CreateBox(character)
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    if not character:FindFirstChild("HumanoidRootPart") then return end
     local box = Drawing.new("Square")
     box.Visible = false
     box.Thickness = 2
-    box.Color = ESPSettings.boxColor
+    box.Color = SafeColor(ESPSettings.boxColor)
     box.Filled = false
     box.Transparency = 1
     BoxESPBoxes[character] = box
 end
 
 local function RemoveBox(character)
-    if BoxESPBoxes[character] then
-        BoxESPBoxes[character]:Remove()
-        BoxESPBoxes[character] = nil
-    end
+    if BoxESPBoxes[character] then BoxESPBoxes[character]:Remove(); BoxESPBoxes[character] = nil end
 end
 
 local function CreateName(character)
-    if not character or not character:FindFirstChild("Head") then return end
+    if not character:FindFirstChild("Head") then return end
     local label = Drawing.new("Text")
     label.Visible = false
-    label.Color = ESPSettings.nameColor
+    label.Color = SafeColor(ESPSettings.nameColor)
     label.Size = 16
     label.Center = true
     label.Outline = true
@@ -143,34 +127,27 @@ local function CreateName(character)
 end
 
 local function RemoveName(character)
-    if NameESPLabels[character] then
-        NameESPLabels[character]:Remove()
-        NameESPLabels[character] = nil
-    end
+    if NameESPLabels[character] then NameESPLabels[character]:Remove(); NameESPLabels[character] = nil end
 end
 
 ------------------------------------------
 -- GLOW FUNCTIONS
 ------------------------------------------
-
 local function CreateGlow(character)
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    if not character:FindFirstChild("HumanoidRootPart") then return end
     local glow = Drawing.new("Circle")
     glow.Visible = false
     glow.Thickness = 4
     glow.NumSides = 30
     glow.Radius = 60
-    glow.Color = ESPSettings.glowColor
+    glow.Color = SafeColor(ESPSettings.glowColor)
     glow.Filled = false
     glow.Transparency = 0.8
     GlowESP[character] = glow
 end
 
 local function RemoveGlow(character)
-    if GlowESP[character] then
-        GlowESP[character]:Remove()
-        GlowESP[character] = nil
-    end
+    if GlowESP[character] then GlowESP[character]:Remove(); GlowESP[character] = nil end
 end
 
 local function UpdateGlow(character, hrp, camera)
@@ -180,7 +157,7 @@ local function UpdateGlow(character, hrp, camera)
         local glow = GlowESP[character]
         glow.Visible = ESPSettings.glowESP
         glow.Position = Vector2.new(pos.X, pos.Y)
-        glow.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.glowColor
+        glow.Color = SafeColor(ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.glowColor)
     else
         GlowESP[character].Visible = false
     end
@@ -189,21 +166,17 @@ end
 ------------------------------------------
 -- TRACER FUNCTIONS
 ------------------------------------------
-
 local function CreateTracer(character)
     if Tracers[character] then return end
     local line = Drawing.new("Line")
     line.Visible = false
     line.Thickness = 1.5
-    line.Color = ESPSettings.tracerColor
+    line.Color = SafeColor(ESPSettings.tracerColor)
     Tracers[character] = line
 end
 
 local function RemoveTracer(character)
-    if Tracers[character] then
-        Tracers[character]:Remove()
-        Tracers[character] = nil
-    end
+    if Tracers[character] then Tracers[character]:Remove(); Tracers[character] = nil end
 end
 
 local function UpdateTracer(character, hrp, camera)
@@ -212,7 +185,7 @@ local function UpdateTracer(character, hrp, camera)
     if onScreen then
         local line = Tracers[character]
         line.Visible = ESPSettings.tracerESP
-        line.Color =  ESPSettings.tracerColor or ESPSettings.mainColor
+        line.Color = SafeColor(ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.tracerColor)
         local screenSize = camera.ViewportSize
         line.From = Vector2.new(screenSize.X / 2, screenSize.Y)
         line.To = Vector2.new(pos.X, pos.Y)
@@ -224,24 +197,20 @@ end
 ------------------------------------------
 -- TEAM CHECK
 ------------------------------------------
-
 local function IsEnemy(player)
     if not ESPSettings.teamCheck then return true end
-    local localPlayer = Players.LocalPlayer
-    return player.Team ~= localPlayer.Team
+    return player.Team ~= Players.LocalPlayer.Team
 end
 
 ------------------------------------------
 -- PLAYER EVENTS
 ------------------------------------------
-
 local function OnCharacterAdded(character)
     CreateBox(character)
     CreateName(character)
     Create3DBox(character)
     CreateGlow(character)
     CreateTracer(character)
-
     local hum = character:FindFirstChild("Humanoid")
     if hum then
         hum.Died:Connect(function()
@@ -269,10 +238,7 @@ local function OnPlayerRemoving(player)
     end
 end
 
-for _, p in ipairs(Players:GetPlayers()) do
-    OnPlayerAdded(p)
-end
-
+for _, p in ipairs(Players:GetPlayers()) do OnPlayerAdded(p) end
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
@@ -280,6 +246,10 @@ Players.PlayerRemoving:Connect(OnPlayerRemoving)
 -- RENDER LOOP
 ------------------------------------------
 
+
+------------------------------------------
+-- RENDER LOOP
+------------------------------------------
 RunService.RenderStepped:Connect(function()
     local camera = Workspace.CurrentCamera
 
@@ -296,7 +266,7 @@ RunService.RenderStepped:Connect(function()
                     box.Visible = true
                     box.Position = Vector2.new(pos.X - width/2, pos.Y - height/2)
                     box.Size = Vector2.new(width, height)
-                    box.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor
+                    box.Color = SafeColor(ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.boxColor)
                 else
                     box.Visible = false
                 end
@@ -316,7 +286,7 @@ RunService.RenderStepped:Connect(function()
                 if onScreen then
                     label.Visible = true
                     label.Position = Vector2.new(pos.X, pos.Y)
-                    label.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.nameColor
+                    label.Color = SafeColor(ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.nameColor)
                 else
                     label.Visible = false
                 end
@@ -373,7 +343,6 @@ end)
 ------------------------------------------
 -- PUBLIC FUNCTIONS
 ------------------------------------------
-
 function ESP:SetBoxESP(b) ESPSettings.boxESP = b end
 function ESP:Set3DBoxESP(b) ESPSettings.box3dESP = b end
 function ESP:SetNameESP(b) ESPSettings.nameESP = b end
@@ -381,11 +350,11 @@ function ESP:SetGlowESP(b) ESPSettings.glowESP = b end
 function ESP:SetTracerESP(b) ESPSettings.tracerESP = b end
 function ESP:SetTeamCheck(b) ESPSettings.teamCheck = b end
 function ESP:SetMasterColor(b) ESPSettings.masterColor = b end
-function ESP:SetBoxColor(c) ESPSettings.boxColor = c end
-function ESP:SetNameColor(c) ESPSettings.nameColor = c end
-function ESP:SetMainColor(c) ESPSettings.mainColor = c end
-function ESP:SetGlowColor(c) ESPSettings.glowColor = c end
-function ESP:SetTracerColor(c) ESPSettings.tracerColor = c end
+function ESP:SetBoxColor(c) ESPSettings.boxColor = SafeColor(c) end
+function ESP:SetNameColor(c) ESPSettings.nameColor = SafeColor(c) end
+function ESP:SetMainColor(c) ESPSettings.mainColor = SafeColor(c) end
+function ESP:SetGlowColor(c) ESPSettings.glowColor = SafeColor(c) end
+function ESP:SetTracerColor(c) ESPSettings.tracerColor = SafeColor(c) end
 
 function ESP:ToggleBoxESP() ESPSettings.boxESP = not ESPSettings.boxESP end
 function ESP:Toggle3DBoxESP() ESPSettings.box3dESP = not ESPSettings.box3dESP end
