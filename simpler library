@@ -1,9 +1,10 @@
--- ESP Library with Color Customization + 3D Box ESP + Glow ESP (Player-Sized)
+-- ESP Library with Color Customization + 3D Box ESP + Glow ESP + Tracers
 -- Usage:
 -- lib.boxESP = true
 -- lib.box3dESP = true
 -- lib.nameESP = true
 -- lib.glowESP = true
+-- lib.tracerESP = true
 -- lib.teamCheck = true
 -- lib.masterColor = true
 
@@ -19,18 +20,21 @@ ESPSettings.boxESP = ESPSettings.boxESP or false
 ESPSettings.box3dESP = ESPSettings.box3dESP or false
 ESPSettings.nameESP = ESPSettings.nameESP or false
 ESPSettings.glowESP = ESPSettings.glowESP or false
+ESPSettings.tracerESP = ESPSettings.tracerESP or false
 ESPSettings.teamCheck = ESPSettings.teamCheck or false
 ESPSettings.masterColor = ESPSettings.masterColor or false
 ESPSettings.boxColor = ESPSettings.boxColor or Color3.fromRGB(255,0,0)
 ESPSettings.nameColor = ESPSettings.nameColor or Color3.fromRGB(255,255,255)
 ESPSettings.mainColor = ESPSettings.mainColor or Color3.fromRGB(0,255,0)
 ESPSettings.glowColor = ESPSettings.glowColor or Color3.fromRGB(0,255,255)
+ESPSettings.tracerColor = ESPSettings.tracerColor or Color3.fromRGB(255,255,0)
 
 -- DRAWING TABLES
 local BoxESPBoxes = {}
 local NameESPLabels = {}
 local Box3DLines = {} -- 12 lines per character
 local GlowESP = {}
+local Tracers = {}
 
 ------------------------------------------
 -- 3D BOX FUNCTIONS
@@ -61,7 +65,6 @@ end
 local function Update3DBox(character, hrp, camera)
     if not Box3DLines[character] then return end
 
-    -- NEW SMALLER SIZE TO FIT PLAYER
     local size = Vector3.new(2, 3, 1.5)
     local cf = hrp.CFrame
 
@@ -70,7 +73,6 @@ local function Update3DBox(character, hrp, camera)
         cf * Vector3.new(size.X, -size.Y, -size.Z),
         cf * Vector3.new(size.X, size.Y, -size.Z),
         cf * Vector3.new(-size.X, size.Y, -size.Z),
-
         cf * Vector3.new(-size.X, -size.Y, size.Z),
         cf * Vector3.new(size.X, -size.Y, size.Z),
         cf * Vector3.new(size.X, size.Y, size.Z),
@@ -179,11 +181,43 @@ local function UpdateGlow(character, hrp, camera)
         glow.Visible = ESPSettings.glowESP
         glow.Position = Vector2.new(pos.X, pos.Y)
         glow.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.glowColor
-        -- Optional dynamic scale by distance (uncomment to enable):
-        -- local scale = 1 / math.max(pos.Z, 0.1) * 120
-        -- glow.Radius = 45 * (scale / 3)
     else
         GlowESP[character].Visible = false
+    end
+end
+
+------------------------------------------
+-- TRACER FUNCTIONS
+------------------------------------------
+
+local function CreateTracer(character)
+    if Tracers[character] then return end
+    local line = Drawing.new("Line")
+    line.Visible = false
+    line.Thickness = 1.5
+    line.Color = ESPSettings.tracerColor
+    Tracers[character] = line
+end
+
+local function RemoveTracer(character)
+    if Tracers[character] then
+        Tracers[character]:Remove()
+        Tracers[character] = nil
+    end
+end
+
+local function UpdateTracer(character, hrp, camera)
+    if not Tracers[character] then return end
+    local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+    if onScreen then
+        local line = Tracers[character]
+        line.Visible = ESPSettings.tracerESP
+        line.Color = ESPSettings.masterColor and ESPSettings.mainColor or ESPSettings.tracerColor
+        local screenSize = camera.ViewportSize
+        line.From = Vector2.new(screenSize.X / 2, screenSize.Y)
+        line.To = Vector2.new(pos.X, pos.Y)
+    else
+        Tracers[character].Visible = false
     end
 end
 
@@ -206,6 +240,7 @@ local function OnCharacterAdded(character)
     CreateName(character)
     Create3DBox(character)
     CreateGlow(character)
+    CreateTracer(character)
 
     local hum = character:FindFirstChild("Humanoid")
     if hum then
@@ -214,6 +249,7 @@ local function OnCharacterAdded(character)
             RemoveName(character)
             Remove3DBox(character)
             RemoveGlow(character)
+            RemoveTracer(character)
         end)
     end
 end
@@ -229,6 +265,7 @@ local function OnPlayerRemoving(player)
         RemoveName(player.Character)
         Remove3DBox(player.Character)
         RemoveGlow(player.Character)
+        RemoveTracer(player.Character)
     end
 end
 
@@ -318,6 +355,19 @@ RunService.RenderStepped:Connect(function()
             glow.Visible = false
         end
     end
+
+    -- TRACERS
+    for character, line in pairs(Tracers) do
+        local player = Players:GetPlayerFromCharacter(character)
+        if player and ESPSettings.tracerESP and IsEnemy(player) then
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                UpdateTracer(character, hrp, camera)
+            end
+        else
+            line.Visible = false
+        end
+    end
 end)
 
 ------------------------------------------
@@ -328,17 +378,20 @@ function ESP:SetBoxESP(b) ESPSettings.boxESP = b end
 function ESP:Set3DBoxESP(b) ESPSettings.box3dESP = b end
 function ESP:SetNameESP(b) ESPSettings.nameESP = b end
 function ESP:SetGlowESP(b) ESPSettings.glowESP = b end
+function ESP:SetTracerESP(b) ESPSettings.tracerESP = b end
 function ESP:SetTeamCheck(b) ESPSettings.teamCheck = b end
 function ESP:SetMasterColor(b) ESPSettings.masterColor = b end
 function ESP:SetBoxColor(c) ESPSettings.boxColor = c end
 function ESP:SetNameColor(c) ESPSettings.nameColor = c end
 function ESP:SetMainColor(c) ESPSettings.mainColor = c end
 function ESP:SetGlowColor(c) ESPSettings.glowColor = c end
+function ESP:SetTracerColor(c) ESPSettings.tracerColor = c end
 
 function ESP:ToggleBoxESP() ESPSettings.boxESP = not ESPSettings.boxESP end
 function ESP:Toggle3DBoxESP() ESPSettings.box3dESP = not ESPSettings.box3dESP end
 function ESP:ToggleNameESP() ESPSettings.nameESP = not ESPSettings.nameESP end
 function ESP:ToggleGlowESP() ESPSettings.glowESP = not ESPSettings.glowESP end
+function ESP:ToggleTracerESP() ESPSettings.tracerESP = not ESPSettings.tracerESP end
 function ESP:ToggleTeamCheck() ESPSettings.teamCheck = not ESPSettings.teamCheck end
 function ESP:ToggleMasterColor() ESPSettings.masterColor = not ESPSettings.masterColor end
 
